@@ -19,6 +19,9 @@ claiming source-level history that does not exist.
 
 ## Archived Windows builds
 
+All preserved installers are available in the
+[Grayfox Windows build archive](https://github.com/MiuraChan/grayfox-video-studio/releases/tag/windows-build-archive-2026-07-28).
+
 ### 0.2.0
 
 - `Grayfox-0.2.0-Windows.exe`
@@ -38,6 +41,4 @@ available.
 ## Checksums
 
 `SHA256SUMS.txt` is attached to the GitHub archive release. A checksum entry is
-available for `Grayfox-0.1.0-Windows.exe`; other assets should be verified
-against the digest displayed by their GitHub Release metadata until a complete
-checksum manifest is generated.
+available for every archived installer.

@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Grayfox — AI Video Editor</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand brand-art" data-testid="grayfox-brand">
+          <span class="brand-signal" role="status" aria-label="Grayfox active"></span>
+          <span>GRAYFOX</span>
+        </div>
+
+        <nav class="nav" aria-label="Primary navigation">
+          <button class="nav-item active" data-view="video-ops">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M4 17.5c2.4-6.8 8.1-10.7 16-11.1-1 7.2-5.5 11.8-13 13.2L4 17.5Z" />
+                <path d="M7 17.2 18.2 7.4M9.5 18.1 18.8 9.6M6.2 14.8l11.1 2M8.2 11.7l7.8 5.9" />
+              </svg>
+            </span>
+            Video ops
+          </button>
+          <button class="nav-item" data-view="shorts">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="m5 19 10.8-10.8 2 2L7 21H4v-3Z" />
+                <path d="m14.8 7.2 2-2 2 2-2 2M8 16l2 2M6.4 17.6l2 2" />
+              </svg>
+            </span>
+            Story clips
+          </button>
+        </nav>
+
+        <div class="recent">
+          <div class="eyebrow">RECENT</div>
+          <div id="recent-projects">
+            <p class="recent-empty">Your saved work will appear here.</p>
+          </div>
+        </div>
+
+        <div class="profile">
+          <span class="avatar" id="workspace-avatar">
+            <img id="workspace-avatar-image" alt="" hidden />
+            <span id="workspace-avatar-initials">GF</span>
+          </span>
+          <span>
+            <strong id="workspace-name">My workspace</strong>
+            <small id="workspace-location">Choose export folder</small>
+          </span>
+          <button class="icon-button" id="workspace-settings" aria-label="Workspace settings">•••</button>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="section-label">AI EDITING WORKSPACE</p>
+            <h1 id="page-title">Video ops</h1>
+          </div>
+          <div class="top-actions">
+            <span class="status-pill"><i class="live-signal"></i> Session active</span>
+            <button class="secondary-button" id="export-button">Export</button>
+          </div>
+        </header>
+
+        <section class="view active" id="video-ops">
+          <div class="workflow-rail" aria-label="Editing workflow">
+            <div class="workflow-step active"><span>01</span><strong>Import</strong><small>Add source video</small></div>
+            <div class="workflow-line"></div>
+            <div class="workflow-step active"><span>02</span><strong>Direct</strong><small>Set goal and tone</small></div>
+            <div class="workflow-line"></div>
+            <div class="workflow-step"><span>03</span><strong>Review</strong><small>Approve AI cut</small></div>
+            <div class="workflow-line"></div>
+            <div class="workflow-step"><span>04</span><strong>Export</strong><small>Render final video</small></div>
+          </div>
+          <div class="editor-grid">
+            <section class="canvas-card">
+              <div class="video-stage" id="video-stage">
+                <video id="video-preview" controls playsinline></video>
+                <div class="empty-state" id="empty-state">
+                  <div class="upload-icon">＋</div>
+                  <h2>Bring in your long-form video</h2>
+                  <p>Drop a file here or choose one from your PC.</p>
+                  <button class="primary-button" id="choose-video">Choose video</button>
+                  <small>MP4, MOV, WebM · processed on this device</small>
+                </div>
+              </div>
+              <input type="file" id="video-input" accept="video/*" hidden />
+
+              <div class="timeline" aria-label="Video timeline">
+                <div class="timeline-ruler">
+                  <span>00:00</span><span>04:00</span><span>08:00</span><span>12:00</span><span>16:00</span>
+                </div>
+                <div class="timeline-track">
+                  <div class="waveform"></div>
+                  <div class="playhead"></div>
+                </div>
+                <div class="edit-controls" aria-label="Production range">
+                  <button class="secondary-button compact-button" id="replace-video" type="button">Replace video</button>
+                  <label>Start <input id="trim-start" type="number" min="0" step="0.1" value="0" /></label>
+                  <label>End <input id="trim-end" type="number" min="0" step="0.1" placeholder="Full video" /></label>
+                </div>
+                <div class="production-status" id="production-status" hidden aria-live="polite">
+                  <div><strong id="production-title">Producing video</strong><span id="production-percent">0%</span></div>
+                  <div class="progress-track"><span id="production-bar"></span></div>
+                  <small id="production-copy">Rendering locally with FFmpeg…</small>
+                </div>
+              </div>
+            </section>
+
+            <aside class="ai-panel">
+              <div class="panel-heading">
+                <div class="ai-glyph" aria-label="Grayfox assistant active"><span class="brand-signal" role="status" aria-label="Grayfox active"></span><span class="assistant-pulse" aria-hidden="true"></span></div>
+                <div>
+                  <h2>Edit brief</h2>
+                  <p>Set the range and describe the result you want.</p>
+                </div>
+              </div>
+
+              <div class="context-strip">
+                <span class="context-label">PROJECT</span>
+                <label class="project-name-shell" for="project-name">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16-.8 4 4-.8L18.8 7.6l-3.2-3.2L4 16Z"/><path d="m13.9 6.1 3.2 3.2"/></svg>
+                  <input id="project-name" value="Untitled edit" maxlength="80" aria-label="Project name" />
+                </label>
+                <span class="context-meta">Draft 01</span>
+              </div>
+
+              <div class="field-group">
+                <div class="label-with-help">
+                  <label for="final-use">Final use</label>
+                  <button class="help-button" type="button" data-help-title="Final use" data-help="Tell Grayfox where the video will live. It uses this to choose pacing, framing, and the right ending." aria-label="Explain final use"><span>?</span></button>
+                </div>
+                <select id="final-use">
+                  <option>Website / landing page</option>
+                  <option>YouTube</option>
+                  <option>Internal presentation</option>
+                  <option>Paid social campaign</option>
+                  <option>Event highlight</option>
+                </select>
+              </div>
+
+              <div class="field-group token-field">
+                <div class="label-row">
+                  <div class="label-with-help">
+                    <label for="tone-token">Tone tokens</label>
+                    <button class="help-button" type="button" data-help-title="Tone tokens" data-help="Add a few words that describe how the edit should feel. Grayfox applies them to pace, music, captions, and cuts." aria-label="Explain tone tokens"><span>?</span></button>
+                  </div>
+                  <span class="optional">Optional</span>
+                </div>
+                <p class="field-help">Words the AI should prioritize when shaping pace, music, captions, and cuts.</p>
+                <div class="token-input-shell" id="token-shell">
+                  <div id="token-list"></div>
+                  <input id="tone-token" type="text" placeholder="Type a token and press Enter" autocomplete="off" />
+                </div>
+                <div class="suggestion-row">
+                  <button class="token-suggestion">Warm</button>
+                  <button class="token-suggestion">Premium</button>
+                  <button class="token-suggestion">Energetic</button>
+                  <button class="token-suggestion">Direct</button>
+                </div>
+                <div class="tone-effect" id="tone-effect">
+                  <span>Pace</span><i></i><span>Music</span><i></i><span>Captions</span><i></i><span>Cuts</span>
+                </div>
+              </div>
+
+              <div class="field-group grow">
+                <div class="label-with-help">
+                  <label for="direction">Editing direction</label>
+                  <button class="help-button" type="button" data-help-title="Editing direction" data-help="Write the result you want, not editing commands. Mention the audience, strongest moment, and what viewers should feel or do." aria-label="Explain editing direction"><span>?</span></button>
+                </div>
+                <textarea id="direction" placeholder="Example: Make this feel confident and concise. Open with the customer result, remove pauses, and finish on the product reveal."></textarea>
+              </div>
+
+              <div class="brief-card">
+                <span>SESSION BRIEF</span>
+                <p id="brief-copy">Add a video and directions to build your editing brief.</p>
+              </div>
+
+              <div class="cut-action" id="cut-action">
+                <div class="button-with-help">
+                  <button class="primary-button full" id="create-cut">
+                    <span>✦</span> Render first cut
+                  </button>
+                  <button class="help-button help-button-on-dark" type="button" data-help-title="First cut" data-help="Grayfox builds a real multi-segment timeline from visible moments, scene changes and audio pauses, then concatenates the selected pieces into a new MP4. Your original file is never changed." aria-label="Explain first cut"><span>?</span></button>
+                </div>
+                <div class="processing-panel" id="processing-panel" hidden aria-live="polite">
+                  <div class="processing-head">
+                    <strong id="processing-title">Creating your first cut</strong>
+                    <span id="processing-eta">Estimating…</span>
+                  </div>
+                  <div class="progress-track" role="progressbar" aria-label="First cut progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <span id="processing-bar"></span>
+                  </div>
+                  <p id="processing-curiosity">Grayfox is reading the rhythm of your source video.</p>
+                  <div class="edit-plan-summary" id="edit-plan-summary" hidden></div>
+                </div>
+              </div>
+              <p class="privacy-note">Video stays on this device. Qwen3-VL evaluates sampled frames locally; FFmpeg analyzes and renders the result.</p>
+            </aside>
+          </div>
+        </section>
+
+        <section class="view" id="shorts">
+          <div class="shorts-layout">
+            <div class="shorts-intro">
+              <span class="eyebrow">LOCAL VISION RANKING</span>
+              <h2>Find the strongest clips and meme beats.</h2>
+                  <p>Grayfox combines local vision AI with measured scene and audio signals. Every candidate gets an edit score, a separate meme score, and a real renderable range.</p>
+              <div class="shorts-settings">
+                <div class="field-group">
+                  <div class="label-with-help">
+                    <label for="short-length">Target length</label>
+                    <button class="help-button" type="button" data-help-title="Target length" data-help="Choose the ideal range. Grayfox keeps the thought complete even when a strong moment runs slightly longer." aria-label="Explain target length"><span>?</span></button>
+                  </div>
+                  <select id="short-length">
+                    <option>30–45 seconds</option>
+                    <option>15–30 seconds</option>
+                    <option>45–60 seconds</option>
+                  </select>
+                </div>
+                <div class="field-group">
+                  <div class="label-with-help">
+                    <label>Platform</label>
+                    <button class="help-button" type="button" data-help-title="Platform" data-help="The destination changes safe areas, caption placement, and the rhythm used for the opening hook." aria-label="Explain platform"><span>?</span></button>
+                  </div>
+                  <div class="segmented">
+                    <button class="active">TikTok</button>
+                    <button>Reels</button>
+                    <button>Shorts</button>
+                  </div>
+                </div>
+                <div class="field-group">
+                  <div class="label-with-help">
+                    <label for="short-tone-token">Tone tokens</label>
+                    <button class="help-button" type="button" data-help-title="Story clip tone" data-help="Describe which moments feel right for your voice, such as bold, funny, candid, or helpful." aria-label="Explain story clip tone"><span>?</span></button>
+                  </div>
+                  <input id="short-tone-token" class="standard-input" placeholder="e.g. bold, helpful, candid" />
+                </div>
+                <div class="evaluation-grid">
+                  <div><span>Source</span><strong>Real duration</strong></div>
+                  <div><span>Output</span><strong>New MP4</strong></div>
+                </div>
+                <div class="button-with-help">
+                  <button class="primary-button full" id="find-moments">Analyze best moments</button>
+                  <button class="help-button help-button-on-dark" type="button" data-help-title="Best moments" data-help="Grayfox samples real frames, detects visual changes and silence, then asks the local vision model to rank hooks and meme potential. Render clip creates the selected MP4." aria-label="Explain best moments"><span>?</span></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="candidate-panel">
+              <div class="candidate-header">
+                <div>
+                  <span class="eyebrow">SUGGESTED CLIPS</span>
+                  <h3>Top moments</h3>
+                </div>
+                <span class="score-key">Edit score</span>
+              </div>
+              <div class="candidate-list" id="candidate-list">
+                <div class="candidate empty-candidate">
+                  <div class="candidate-placeholder">✦</div>
+                  <p>Upload a video, then run local analysis to rank edit moments and meme beats.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="help-popover" id="help-popover" hidden role="dialog" aria-labelledby="help-title">
+      <button class="help-close" id="help-close" aria-label="Close explanation">×</button>
+      <span class="eyebrow">GRAYFOX GUIDE</span>
+      <h3 id="help-title">How it works</h3>
+      <p id="help-copy"></p>
+      <button class="speak-button" id="speak-help" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9v6h4l5 4V5L9 9H5Z"/><path d="M17 9c1.4 1.6 1.4 4.4 0 6M19.5 6.5c3 3 3 8 0 11"/></svg>
+        Listen
+      </button>
+    </div>
+
+    <div class="modal-backdrop" id="workspace-modal" hidden>
+      <section class="workspace-modal-card" role="dialog" aria-modal="true" aria-labelledby="workspace-modal-title">
+        <button class="modal-close" id="workspace-close" type="button" aria-label="Close workspace settings" hidden>×</button>
+        <span class="modal-brand-mark brand-signal" role="status" aria-label="Grayfox active"></span>
+        <p class="eyebrow">LOCAL WORKSPACE</p>
+        <h2 id="workspace-modal-title">Hi! My codename is Grayfox.</h2>
+        <p class="modal-intro">I need your name and a folder where to put my work.</p>
+        <div class="profile-image-manager">
+          <div class="profile-image-preview" id="profile-image-preview">
+            <img id="profile-image-preview-image" alt="" hidden />
+            <span id="profile-preview-initials">GF</span>
+          </div>
+          <div>
+            <strong>Profile image</strong>
+            <p>Choose a JPG, PNG, or WebP image up to 2 MB.</p>
+            <div class="profile-image-actions">
+              <button class="secondary-button compact-button" id="choose-profile-image" type="button">Choose image</button>
+              <button class="text-button" id="remove-profile-image" type="button" hidden>Remove</button>
+            </div>
+            <p class="profile-image-status" id="profile-image-status" role="status" aria-live="polite"></p>
+          </div>
+        </div>
+        <div class="field-group">
+          <label for="workspace-user-name">Your name</label>
+          <input class="standard-input" id="workspace-user-name" autocomplete="name" placeholder="e.g. Marco" />
+        </div>
+        <div class="field-group">
+          <label for="workspace-export-path">Export folder</label>
+          <div class="path-picker">
+            <input class="standard-input" id="workspace-export-path" readonly placeholder="Choose a folder on this PC" />
+            <button class="secondary-button" id="choose-export-path" type="button">Choose folder</button>
+          </div>
+          <small class="selected-export-path" id="selected-export-path" hidden></small>
+          <small class="browser-folder-help" id="browser-folder-help" hidden>Browser preview: empty folders can also be entered manually.</small>
+        </div>
+        <p class="modal-error" id="workspace-error" role="alert"></p>
+        <button class="primary-button full" id="create-workspace" type="button">Start session</button>
+        <p class="privacy-note modal-privacy">Temporary session: name, folder, image, and projects are not saved after Grayfox closes.</p>
+      </section>
+    </div>
+
+    <input type="file" id="browser-folder-input" webkitdirectory directory hidden />
+    <input type="file" id="profile-image-input" accept="image/*" hidden />
+    <div class="toast" id="toast" role="status"></div>
+    <script src="./app.js"></script>
+  </body>
+</html>

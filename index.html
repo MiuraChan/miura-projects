@@ -101,8 +101,8 @@
                 </div>
                 <div class="edit-controls" aria-label="Production range">
                   <button class="secondary-button compact-button" id="replace-video" type="button">Replace video</button>
-                  <label>Start <input id="trim-start" type="number" min="0" step="0.1" value="0" /></label>
-                  <label>End <input id="trim-end" type="number" min="0" step="0.1" placeholder="Full video" /></label>
+                  <label>Start (sec) <input id="trim-start" type="number" min="0" step="0.1" value="0" /></label>
+                  <label>End (sec) <input id="trim-end" type="number" min="0" step="0.1" placeholder="Full video" /></label>
                 </div>
                 <div class="production-status" id="production-status" hidden aria-live="polite">
                   <div><strong id="production-title">Producing video</strong><span id="production-percent">0%</span></div>
@@ -142,6 +142,15 @@
                   <option>Paid social campaign</option>
                   <option>Event highlight</option>
                 </select>
+              </div>
+
+              <div class="field-group">
+                <div class="label-with-help">
+                  <label for="target-minutes">Target duration</label>
+                  <button class="help-button" type="button" data-help-title="Target duration" data-help="This is a production requirement. Enter 40 for a forty-minute output. Grayfox validates the rendered duration before calling the edit complete." aria-label="Explain target duration"><span>?</span></button>
+                </div>
+                <input class="standard-input" id="target-minutes" type="number" min="0.1" step="0.5" inputmode="decimal" placeholder="Auto for selected use" />
+                <p class="field-help">Minutes. Grayfox will never silently replace this with a short highlight.</p>
               </div>
 
               <div class="field-group token-field">

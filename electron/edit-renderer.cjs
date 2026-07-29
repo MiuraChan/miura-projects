@@ -17,7 +17,7 @@ function safeProjectName(value) {
 
 function cleanSegments(rawSegments, fullDuration) {
   if (!Array.isArray(rawSegments)) return [];
-  return rawSegments.slice(0, 12).map((segment) => {
+  return rawSegments.slice(0, 64).map((segment) => {
     const start = Math.min(Math.max(0, Number(segment?.start) || 0), fullDuration - 0.05);
     const end = Math.min(Math.max(Number(segment?.end) || 0, start + 0.05), fullDuration);
     return { start, end, role: String(segment?.role || "body").slice(0, 30) };
@@ -99,6 +99,11 @@ function createEditRenderer({ resolveMediaTool, probeDuration, cleanText }) {
     if (segments.length < 2) throw new Error("A real edit needs at least two valid timeline segments.");
 
     const requestedDuration = segments.reduce((total, segment) => total + (segment.end - segment.start), 0);
+    const expectedDuration = Math.min(fullDuration, Math.max(0, Number(payload?.expectedDuration) || 0));
+    const expectedTolerance = Math.max(2, expectedDuration * 0.03);
+    if (expectedDuration && requestedDuration < expectedDuration - expectedTolerance) {
+      throw new Error(`The edit plan covers only ${formatTimestamp(requestedDuration)} but ${formatTimestamp(expectedDuration)} was requested. Grayfox stopped instead of producing a misleading short file.`);
+    }
     const { stdout: audioStream } = await execFileAsync(ffprobePath, [
       "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=index", "-of", "csv=p=0", sourcePath,
     ], { windowsHide: true });
@@ -187,12 +192,19 @@ function createEditRenderer({ resolveMediaTool, probeDuration, cleanText }) {
       if (!Number.isFinite(duration) || duration < 0.05 || outputStat.size < 1024) {
         throw new Error("Grayfox rendered an empty file. The selected source sections may be damaged.");
       }
+      const meetsTarget = !expectedDuration || duration >= expectedDuration - expectedTolerance;
+      const durationWarning = meetsTarget
+        ? null
+        : `Rendered ${formatTimestamp(duration)} of the requested ${formatTimestamp(expectedDuration)} because ${skippedSegments.length} source section${skippedSegments.length === 1 ? " was" : "s were"} unreadable.`;
       event.sender.send("video:production-progress", { percent: 100, outputPath, phase: "multi-segment-edit" });
       return {
         outputPath,
         duration,
         segmentCount: rendered.length,
         requestedSegmentCount: segments.length,
+        targetDuration: expectedDuration || requestedDuration,
+        meetsTarget,
+        durationWarning,
         segments: rendered.map(({ path: _path, duration: _duration, requestedIndex: _requestedIndex, ...segment }) => segment),
         skippedSegments,
         sourceDuration: fullDuration,

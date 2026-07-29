@@ -35,6 +35,7 @@ function createGrayfoxApp(doc, win) {
     tokenList: doc.querySelector("#token-list"),
     direction: doc.querySelector("#direction"),
     finalUse: doc.querySelector("#final-use"),
+    targetMinutes: doc.querySelector("#target-minutes"),
     brief: doc.querySelector("#brief-copy"),
     toast: doc.querySelector("#toast"),
     projectName: doc.querySelector("#project-name"),
@@ -119,11 +120,23 @@ function createGrayfoxApp(doc, win) {
       : null;
   }
 
+  const workspaceStorageKey = "grayfox.workspace.v3";
+
   async function readBrowserWorkspace() {
-    return null;
+    try {
+      const saved = win.localStorage?.getItem(workspaceStorageKey);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
   }
 
   async function persistWorkspace() {
+    if (!state.workspace) return null;
+    if (desktop?.saveWorkspace) return desktop.saveWorkspace(state.workspace);
+    try {
+      win.localStorage?.setItem(workspaceStorageKey, JSON.stringify(state.workspace));
+    } catch { /* File previews can have an opaque origin. */ }
     return state.workspace;
   }
 
@@ -172,7 +185,7 @@ function createGrayfoxApp(doc, win) {
       projects: Array.isArray(workspace.projects) ? workspace.projects.map((project) => ({
         ...project,
         source: project.source || (project.sourceName ? { name: project.sourceName, path: null, size: 0, lastModified: 0, duration: 0 } : null),
-        editor: project.editor || { finalUse: "Website / landing page", direction: "", tokens: [] },
+        editor: project.editor || { finalUse: "Website / landing page", targetMinutes: 0, direction: "", tokens: [] },
         shorts: project.shorts || { length: "30–45 seconds", platform: "TikTok", tone: "" },
         trim: project.trim || { start: 0, end: 0 },
       })) : [],
@@ -199,7 +212,17 @@ function createGrayfoxApp(doc, win) {
       // Never leave the file preview blank while a browser storage API is pending.
       elements.workspaceModal.hidden = false;
     }
-    // Onboarding intentionally starts fresh on every launch. Nothing is loaded from disk.
+    let savedWorkspace = null;
+    try {
+      savedWorkspace = desktop?.loadWorkspace ? await desktop.loadWorkspace() : await readBrowserWorkspace();
+    } catch { /* Invalid or unavailable saved settings fall back to onboarding. */ }
+    if (savedWorkspace?.userName && savedWorkspace?.exportPath) {
+      applyWorkspace(savedWorkspace);
+      const currentProject = state.workspace.projects.find((project) => project.id === state.workspace.currentProjectId) || state.workspace.projects[0];
+      if (currentProject) await restoreProject(currentProject);
+      showToast(`Welcome back, ${state.workspace.userName}. Your production settings are ready.`);
+      return savedWorkspace;
+    }
     elements.workspaceModal.hidden = false;
     return null;
   }
@@ -342,7 +365,7 @@ function createGrayfoxApp(doc, win) {
     applyWorkspace({ userName, exportPath, profileImage: state.profileImage, currentProjectId: state.projectId, projects: previousProjects });
     try {
       await persistWorkspace();
-      showToast("Session ready. Nothing will be saved after Grayfox closes.");
+      showToast("Workspace ready. Your name, folder and production options will be remembered on this PC.");
       return true;
     } catch (error) {
       elements.workspaceModal.hidden = false;
@@ -370,6 +393,7 @@ function createGrayfoxApp(doc, win) {
       source: state.source ? { ...state.source } : null,
       editor: {
         finalUse: elements.finalUse.value,
+        targetMinutes: Math.max(0, Number(elements.targetMinutes.value) || 0),
         direction: elements.direction.value,
         tokens: [...state.tokens],
       },
@@ -407,6 +431,7 @@ function createGrayfoxApp(doc, win) {
     state.tokens = Array.isArray(project.editor?.tokens) ? [...project.editor.tokens] : [];
     elements.projectName.value = state.projectName;
     elements.finalUse.value = project.editor?.finalUse || "Website / landing page";
+    elements.targetMinutes.value = Number(project.editor?.targetMinutes) > 0 ? project.editor.targetMinutes : "";
     elements.direction.value = project.editor?.direction || "";
     elements.shortLength.value = project.shorts?.length || "30–45 seconds";
     elements.shortTone.value = project.shorts?.tone || "";
@@ -558,6 +583,33 @@ function createGrayfoxApp(doc, win) {
     button.addEventListener("click", () => addToken(button.textContent));
   });
 
+  function parseRequestedDurationSeconds(value) {
+    const normalized = String(value || "").replace(",", ".");
+    const match = normalized.match(/(\d+(?:\.\d+)?)\s*(hours?|hrs?|hr|h|minutes?|mins?|min|m|seconds?|secs?|sec|s)\b/i);
+    if (!match) return 0;
+    const amount = Number(match[1]);
+    if (!Number.isFinite(amount) || amount <= 0) return 0;
+    const unit = match[2].toLowerCase();
+    if (unit.startsWith("h")) return amount * 3600;
+    if (unit.startsWith("s")) return amount;
+    return amount * 60;
+  }
+
+  function requestedProductionSeconds() {
+    const explicitMinutes = Number(elements.targetMinutes.value);
+    if (Number.isFinite(explicitMinutes) && explicitMinutes > 0) return explicitMinutes * 60;
+    const directedDuration = parseRequestedDurationSeconds(elements.direction.value);
+    if (directedDuration > 0) return directedDuration;
+    const useLengths = {
+      "Website / landing page": 45,
+      "YouTube": 90,
+      "Internal presentation": 90,
+      "Paid social campaign": 30,
+      "Event highlight": 60,
+    };
+    return useLengths[elements.finalUse.value] || 45;
+  }
+
   function updateBrief() {
     const filePart = state.file ? `Edit “${state.file.name}”` : "Edit the uploaded video";
     const usePart = `for ${elements.finalUse.value.toLowerCase()}`;
@@ -565,12 +617,15 @@ function createGrayfoxApp(doc, win) {
     const directionPart = elements.direction.value.trim()
       ? `. Direction: ${elements.direction.value.trim()}`
       : ".";
-    elements.brief.textContent = `${filePart} ${usePart}${tokenPart}${directionPart}`;
+    const explicitTarget = Number(elements.targetMinutes.value) > 0 ? Number(elements.targetMinutes.value) * 60 : parseRequestedDurationSeconds(elements.direction.value);
+    const targetPart = explicitTarget ? ` Target output: ${formatClipTime(explicitTarget)}.` : "";
+    elements.brief.textContent = `${filePart} ${usePart}${tokenPart}${directionPart}${targetPart}`;
     return elements.brief.textContent;
   }
 
   elements.direction.addEventListener("input", () => { updateBrief(); scheduleSave(); });
   elements.finalUse.addEventListener("change", () => { updateBrief(); scheduleSave(); });
+  elements.targetMinutes.addEventListener("input", updateBrief);
 
   function activateView(view) {
     state.activeView = view;
@@ -595,7 +650,7 @@ function createGrayfoxApp(doc, win) {
     });
   });
 
-  [elements.shortLength, elements.shortTone, elements.trimStart, elements.trimEnd].forEach((input) => {
+  [elements.shortLength, elements.shortTone, elements.trimStart, elements.trimEnd, elements.targetMinutes].forEach((input) => {
     input.addEventListener("input", scheduleSave);
     input.addEventListener("change", scheduleSave);
   });
@@ -620,9 +675,12 @@ function createGrayfoxApp(doc, win) {
     if (!elements.editPlanSummary) return;
     const segments = editPlan?.segments || [];
     elements.editPlanSummary.hidden = !segments.length;
-    elements.editPlanSummary.innerHTML = segments.map((segment, index) =>
+    const visibleSegments = segments.slice(0, 12);
+    elements.editPlanSummary.innerHTML = visibleSegments.map((segment, index) =>
       `<span class="edit-plan-chip">${index + 1} · ${formatClipTime(segment.start)}–${formatClipTime(segment.end)} · ${escapeHtml(segment.role || "body")}</span>`
-    ).join("");
+    ).join("") + (segments.length > visibleSegments.length
+      ? `<span class="edit-plan-chip">+${segments.length - visibleSegments.length} more cuts</span>`
+      : "");
   }
 
   function startFirstCut() {
@@ -675,17 +733,11 @@ function createGrayfoxApp(doc, win) {
     try {
       const manualStart = Number(elements.trimStart.value) || 0;
       const manualEnd = Number(elements.trimEnd.value) || 0;
-      const useLengths = {
-        "Website / landing page": 45,
-        "YouTube": 90,
-        "Internal presentation": 90,
-        "Paid social campaign": 30,
-        "Event highlight": 60,
+      const targetLength = requestedProductionSeconds();
+      let selectedRange = {
+        start: manualStart,
+        end: Math.min(manualEnd || state.source.duration || manualStart + targetLength, manualStart + targetLength),
       };
-      const targetLength = manualEnd > manualStart
-        ? manualEnd - manualStart
-        : useLengths[elements.finalUse.value] || 45;
-      let selectedRange = { start: manualStart, end: manualEnd };
       if (desktop.analyzeVideo) {
         elements.processingTitle.textContent = "Building a multi-segment edit plan";
         elements.processingEta.textContent = "Scenes, pauses and local vision…";
@@ -703,6 +755,10 @@ function createGrayfoxApp(doc, win) {
         if (best) selectedRange = { start: best.start, end: best.end };
       }
       const editPlan = state.analysis?.editPlan || null;
+      const effectiveTargetLength = Number(state.analysis?.targetLength) || targetLength;
+      if (editPlan?.segments?.length === 1) {
+        selectedRange = { start: editPlan.segments[0].start, end: editPlan.segments[0].end };
+      }
       renderEditPlanSummary(editPlan);
       elements.processingTitle.textContent = editPlan?.segments?.length > 1
         ? `Rendering ${editPlan.segments.length} edited segments`
@@ -712,29 +768,44 @@ function createGrayfoxApp(doc, win) {
         sourcePath: state.source.path,
         exportPath: state.workspace.exportPath,
         projectName: `${state.projectName}-first-cut`,
+        expectedDuration: effectiveTargetLength,
       };
       const result = editPlan?.segments?.length > 1 && desktop.produceEditedVideo
-        ? await desktop.produceEditedVideo({ ...commonPayload, segments: editPlan.segments })
+        ? await desktop.produceEditedVideo({ ...commonPayload, segments: editPlan.segments, expectedDuration: effectiveTargetLength })
         : await desktop.produceVideo({
           ...commonPayload,
           trimStart: selectedRange.start,
           trimEnd: selectedRange.end,
         });
+      const durationTolerance = Math.max(2, effectiveTargetLength * 0.03);
+      result.targetDuration = Number(result.targetDuration) || effectiveTargetLength;
+      result.meetsTarget = typeof result.meetsTarget === "boolean"
+        ? result.meetsTarget
+        : Number(result.duration) >= effectiveTargetLength - durationTolerance;
+      if (!result.meetsTarget && !result.durationWarning) {
+        result.durationWarning = `Rendered ${formatClipTime(result.duration)} of requested ${formatClipTime(effectiveTargetLength)}.`;
+      }
       state.firstCut = { ...result, analysis: state.analysis, editPlan, selectedRange };
       if (desktop.restoreVideo) {
         const rendered = await desktop.restoreVideo(result.outputPath);
         if (rendered?.url) elements.preview.src = rendered.url;
       }
       completeFirstCut(result);
-      if (editPlan?.segments?.length > 1) {
+      if (editPlan?.segments?.length) {
         const skippedCount = result.skippedSegments?.length || 0;
-        if (skippedCount) {
+        if (!result.meetsTarget) {
+          elements.processingTitle.textContent = "First cut incomplete — review source";
+          elements.processingEta.textContent = `${formatClipTime(result.duration)} / ${formatClipTime(result.targetDuration)}`;
+          elements.processingCuriosity.textContent = `${result.durationWarning} ${skippedCount ? `${skippedCount} damaged section${skippedCount === 1 ? " was" : "s were"} skipped. ` : ""}Saved to ${result.outputPath}`;
+          showToast("The file was rendered but did not meet the requested duration.");
+        } else if (skippedCount) {
           elements.processingTitle.textContent = "First cut ready with a source warning";
-          elements.processingEta.textContent = `${result.segmentCount}/${result.requestedSegmentCount} sections rendered`;
+          elements.processingEta.textContent = `${formatClipTime(result.duration)} rendered`;
           elements.processingCuriosity.textContent = `${result.segmentCount} sections rendered · ${skippedCount} damaged or incomplete section${skippedCount === 1 ? " was" : "s were"} skipped. Saved to ${result.outputPath}`;
           showToast(`First cut ready. ${skippedCount} damaged source section${skippedCount === 1 ? " was" : "s were"} skipped.`);
         } else {
-          elements.processingCuriosity.textContent = `${result.segmentCount} source sections concatenated · ${result.duration.toFixed(1)}s output · ${result.removedDuration.toFixed(1)}s removed. Saved to ${result.outputPath}`;
+          elements.processingEta.textContent = `${formatClipTime(result.duration)} / ${formatClipTime(result.targetDuration)}`;
+          elements.processingCuriosity.textContent = `${result.segmentCount || 1} source section${result.segmentCount === 1 ? "" : "s"} rendered · target duration met · saved to ${result.outputPath}`;
         }
       } else if (state.analysis?.candidates?.[0]) {
         const best = state.analysis.candidates[0];
@@ -953,12 +1024,14 @@ function createGrayfoxApp(doc, win) {
         projectName: state.projectName,
       };
       const editSegments = state.firstCut?.editPlan?.segments || [];
+      const targetDuration = Number(state.firstCut?.targetDuration) || requestedProductionSeconds();
+      const singleSegment = editSegments[0] || null;
       const result = editSegments.length > 1 && desktop.produceEditedVideo
-        ? await desktop.produceEditedVideo({ ...exportPayload, segments: editSegments })
+        ? await desktop.produceEditedVideo({ ...exportPayload, segments: editSegments, expectedDuration: targetDuration })
         : await desktop.produceVideo({
           ...exportPayload,
-          trimStart: Number(elements.trimStart.value) || 0,
-          trimEnd: Number(elements.trimEnd.value) || 0,
+          trimStart: singleSegment?.start ?? (Number(elements.trimStart.value) || 0),
+          trimEnd: singleSegment?.end ?? (Number(elements.trimEnd.value) || 0),
         });
       state.lastExportPath = result.outputPath;
       elements.productionTitle.textContent = "Video ready";
@@ -1002,6 +1075,8 @@ function createGrayfoxApp(doc, win) {
     advanceFirstCut,
     completeFirstCut,
     estimateFirstCutSeconds,
+    parseRequestedDurationSeconds,
+    requestedProductionSeconds,
     setProfileImage,
     readBrowserWorkspace,
     restoreProject,

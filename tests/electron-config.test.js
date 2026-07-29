@@ -32,12 +32,14 @@ describe("Electron production configuration", () => {
     expect(mainSource).toContain("event.preventDefault()");
   });
 
-  it("keeps workspace data session-only and exposes the real FFmpeg bridge", () => {
+  it("persists sanitized workspace preferences and exposes the real FFmpeg bridge", () => {
     expect(mainSource).toContain('ipcMain.handle("workspace:choose-export-path"');
-    expect(mainSource).toContain('ipcMain.handle("workspace:load", async () => null)');
+    expect(mainSource).toContain('ipcMain.handle("workspace:load"');
     expect(mainSource).toContain('ipcMain.handle("workspace:save"');
-    expect(mainSource).not.toContain("workspace.json");
-    expect(mainSource).not.toContain("fs.writeFile");
+    expect(mainSource).toContain('grayfox-workspace.json');
+    expect(mainSource).toContain('cleanWorkspaceForStorage');
+    expect(mainSource).toContain('path: null');
+    expect(mainSource).toContain('fs.writeFile');
     expect(preloadSource).toContain('ipcRenderer.invoke("workspace:choose-export-path")');
     expect(mainSource).toContain('ipcMain.handle("video:choose"');
     expect(mainSource).toContain('ipcMain.handle("video:restore"');

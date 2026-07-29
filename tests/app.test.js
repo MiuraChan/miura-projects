@@ -250,6 +250,52 @@ describe("Video and AI brief workflow", () => {
     expect(result.analysis.provider).toBe("ollama-vision");
     expect(document.querySelector("#processing-curiosity").textContent).toContain("Visible product reveal");
   });
+  it("parses production duration from natural-language directions", () => {
+    const { app } = setup();
+    expect(app.parseRequestedDurationSeconds("Give me 40 minutes")).toBe(2400);
+    expect(app.parseRequestedDurationSeconds("Cut this to 1.5 hours")).toBe(5400);
+    expect(app.parseRequestedDurationSeconds("Need a 20 seconds teaser")).toBe(20);
+  });
+
+  it("passes a forty-minute requirement through analysis and rendering", async () => {
+    const segments = [
+      { start: 0, end: 480, role: "hook" },
+      { start: 540, end: 1020, role: "body" },
+      { start: 1080, end: 1560, role: "body" },
+      { start: 1620, end: 2100, role: "body" },
+      { start: 2160, end: 2640, role: "close" },
+    ];
+    const desktop = {
+      chooseExportPath: vi.fn(),
+      analyzeVideo: vi.fn().mockResolvedValue({
+        targetLength: 2400,
+        candidates: [{ start: 0, end: 20, score: 90, title: "Opening" }],
+        editPlan: { segments, outputDuration: 2400, requestedDuration: 2400, durationLocked: true },
+      }),
+      produceEditedVideo: vi.fn().mockResolvedValue({
+        outputPath: "C:/Exports/forty-minutes.mp4", duration: 2400, targetDuration: 2400,
+        meetsTarget: true, segmentCount: 5, requestedSegmentCount: 5, skippedSegments: [], removedDuration: 300,
+      }),
+      produceVideo: vi.fn(),
+      restoreVideo: vi.fn().mockResolvedValue({ url: "file:///C:/Exports/forty-minutes.mp4" }),
+      onProductionProgress: vi.fn(() => vi.fn()),
+    };
+    const { document, app } = setup("https://grayfox.local/", desktop);
+    await app.ready;
+    document.querySelector("#workspace-user-name").value = "Marco";
+    document.querySelector("#workspace-export-path").value = "C:/Exports";
+    await app.createWorkspace();
+    app.loadVideo({ name: "long.mp4", path: "C:/Videos/long.mp4", url: "file:///C:/Videos/long.mp4", size: 1000, duration: 2700 });
+    document.querySelector("#target-minutes").value = "40";
+
+    const result = await app.createFirstCut();
+
+    expect(desktop.analyzeVideo).toHaveBeenCalledWith(expect.objectContaining({ targetLength: 2400 }));
+    expect(desktop.produceEditedVideo).toHaveBeenCalledWith(expect.objectContaining({ expectedDuration: 2400, segments }));
+    expect(result.duration).toBe(2400);
+    expect(document.querySelector("#processing-eta").textContent).toBe("40:00 / 40:00");
+    expect(document.querySelector("#processing-curiosity").textContent).toContain("target duration met");
+  });
   it("renders the AI edit plan as a real multi-segment first cut", async () => {
     const desktop = {
       chooseExportPath: vi.fn(),
@@ -283,6 +329,7 @@ describe("Video and AI brief workflow", () => {
     document.querySelector("#workspace-export-path").value = "C:/Exports";
     await app.createWorkspace();
     app.loadVideo({ name: "source.mp4", path: "C:/Videos/source.mp4", url: "file:///C:/Videos/source.mp4", size: 1000, duration: 60 });
+    document.querySelector("#target-minutes").value = "0.25";
 
     const result = await app.createFirstCut();
 
@@ -296,7 +343,7 @@ describe("Video and AI brief workflow", () => {
     }));
     expect(desktop.produceVideo).not.toHaveBeenCalled();
     expect(document.querySelectorAll(".edit-plan-chip")).toHaveLength(3);
-    expect(document.querySelector("#processing-curiosity").textContent).toContain("3 source sections concatenated");
+    expect(document.querySelector("#processing-curiosity").textContent).toContain("target duration met");
     expect(result.segmentCount).toBe(3);
   });
 
@@ -330,13 +377,14 @@ describe("Video and AI brief workflow", () => {
     document.querySelector("#workspace-export-path").value = "C:/Exports";
     await app.createWorkspace();
     app.loadVideo({ name: "damaged.mp4", path: "C:/Videos/damaged.mp4", url: "file:///C:/Videos/damaged.mp4", size: 1000, duration: 2245 });
+    document.querySelector("#direction").value = "Make a 2 seconds recovery test.";
 
     const result = await app.createFirstCut();
 
     expect(result.segmentCount).toBe(1);
     expect(result.skippedSegments).toHaveLength(1);
     expect(document.querySelector("#processing-title").textContent).toBe("First cut ready with a source warning");
-    expect(document.querySelector("#processing-eta").textContent).toBe("1/2 sections rendered");
+    expect(document.querySelector("#processing-eta").textContent).toBe("00:02 rendered");
     expect(document.querySelector("#processing-curiosity").textContent).toContain("1 damaged or incomplete section was skipped");
     expect(document.querySelector("#video-preview").src).toBe("file:///C:/Exports/recovered.mp4");
   });
@@ -362,6 +410,7 @@ describe("Video and AI brief workflow", () => {
     expect(project.source.name).toBe("right-final.mp4");
     expect(project.editor).toEqual({
       finalUse: "YouTube",
+      targetMinutes: 0,
       direction: "Keep the correct final source.",
       tokens: ["Direct"],
     });
@@ -515,7 +564,7 @@ describe("Workspace setup and project history", () => {
     expect(document.querySelector("#workspace-export-path")).not.toBeNull();
   });
 
-  it("always shows fresh onboarding and ignores previous stored workspace data", async () => {
+  it("restores the saved user and export folder", async () => {
     const desktop = {
       loadWorkspace: vi.fn().mockResolvedValue({ userName: "Old user", exportPath: "C:/Old", projects: [] }),
       saveWorkspace: vi.fn(),
@@ -523,12 +572,12 @@ describe("Workspace setup and project history", () => {
     };
     const { document, app } = setup("https://grayfox.local/", desktop);
     await app.ready;
-    expect(document.querySelector("#workspace-modal").hidden).toBe(false);
-    expect(document.querySelector("#workspace-user-name").value).toBe("");
-    expect(document.querySelector("#workspace-export-path").value).toBe("");
-    expect(desktop.loadWorkspace).not.toHaveBeenCalled();
+    expect(document.querySelector("#workspace-modal").hidden).toBe(true);
+    expect(document.querySelector("#workspace-user-name").value).toBe("Old user");
+    expect(document.querySelector("#workspace-export-path").value).toBe("C:/Old");
+    expect(desktop.loadWorkspace).toHaveBeenCalledOnce();
   });
-  it("chooses a folder and keeps renamed work in the current session only", async () => {
+  it("chooses a folder and persists renamed work", async () => {
     const desktop = {
       loadWorkspace: vi.fn().mockResolvedValue(null),
       chooseExportPath: vi.fn().mockResolvedValue("C:\\Users\\Marco\\Videos"),
@@ -551,7 +600,8 @@ describe("Workspace setup and project history", () => {
     await Promise.resolve();
     expect(app.state.projectName).toBe("Launch film");
     expect(document.querySelector(".recent-item strong").textContent).toBe("Launch film");
-    expect(desktop.saveWorkspace).not.toHaveBeenCalled();
+    expect(desktop.saveWorkspace).toHaveBeenCalled();
+    expect(desktop.saveWorkspace.mock.calls.at(-1)[0].projects[0].name).toBe("Launch film");
   });
 
   it("uses the real directory picker in file preview mode and shows the selected folder", async () => {
@@ -596,24 +646,40 @@ describe("Workspace setup and project history", () => {
     expect(document.querySelector("#workspace-modal").hidden).toBe(true);
   });
 
-  it("does not retain name, folder, projects, or profile image after reload", async () => {
-    const first = setup("file:///C:/Grayfox/index.html");
+  it("restores the user and production options on the next desktop launch", async () => {
+    let savedWorkspace = null;
+    const desktop = {
+      loadWorkspace: vi.fn(async () => savedWorkspace),
+      saveWorkspace: vi.fn(async (workspace) => {
+        savedWorkspace = JSON.parse(JSON.stringify(workspace));
+        return savedWorkspace;
+      }),
+      chooseExportPath: vi.fn(),
+      restoreVideo: vi.fn().mockResolvedValue(null),
+    };
+    const first = setup("https://grayfox.local/", desktop);
     await first.app.ready;
     first.document.querySelector("#workspace-user-name").value = "Marco";
-    first.document.querySelector("#workspace-export-path").value = "Grayfox exports";
-    expect(await first.app.setProfileImage("data:image/png;base64,aGVsbG8=")).toBe(true);
-    expect(await first.app.createWorkspace()).toBe(true);
-    await first.app.saveProject("Temporary draft");
-    expect(first.window.name).toBe("");
+    first.document.querySelector("#workspace-export-path").value = "C:/Grayfox exports";
+    await first.app.createWorkspace();
+    first.document.querySelector("#project-name").value = "Long interview";
+    first.document.querySelector("#target-minutes").value = "40";
+    first.document.querySelector("#final-use").value = "YouTube";
+    first.document.querySelector("#direction").value = "Keep the full conversation and remove dead air.";
+    first.app.addToken("Natural");
+    await first.app.saveProject("Production settings");
 
-    const second = setup("file:///C:/Grayfox/index.html");
+    const second = setup("https://grayfox.local/", desktop);
     await second.app.ready;
-    expect(second.document.querySelector("#workspace-modal").hidden).toBe(false);
-    expect(second.document.querySelector("#workspace-user-name").value).toBe("");
-    expect(second.document.querySelector("#workspace-export-path").value).toBe("");
-    expect(second.document.querySelector("#workspace-avatar").classList.contains("has-image")).toBe(false);
+    expect(second.document.querySelector("#workspace-modal").hidden).toBe(true);
+    expect(second.document.querySelector("#workspace-user-name").value).toBe("Marco");
+    expect(second.document.querySelector("#workspace-export-path").value).toBe("C:/Grayfox exports");
+    expect(second.document.querySelector("#target-minutes").value).toBe("40");
+    expect(second.document.querySelector("#final-use").value).toBe("YouTube");
+    expect(second.document.querySelector("#direction").value).toContain("remove dead air");
+    expect(second.app.state.tokens).toEqual(["Natural"]);
   });
-  it("manages and removes a profile image inside the current session", async () => {
+  it("persists and removes a profile image", async () => {
     const desktop = {
       loadWorkspace: vi.fn().mockResolvedValue({
         userName: "Marco",
@@ -638,7 +704,7 @@ describe("Workspace setup and project history", () => {
     expect(document.querySelector("#profile-image-preview-image").hidden).toBe(false);
     expect(document.querySelector("#remove-profile-image").hidden).toBe(false);
     expect(document.querySelector("#profile-image-status").textContent).toContain("approved");
-    expect(desktop.saveWorkspace).not.toHaveBeenCalled();
+    expect(desktop.saveWorkspace).toHaveBeenCalled();
 
     document.querySelector("#remove-profile-image").click();
     await Promise.resolve();

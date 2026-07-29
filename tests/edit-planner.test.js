@@ -49,4 +49,34 @@ describe("Grayfox multi-segment edit planner", () => {
       { start: 10, end: 12 },
     ]);
   });
+
+  it("locks a forty-minute long-form production to the requested duration", () => {
+    const plan = buildEditPlan({
+      candidates: [
+        { start: 100, end: 120, score: 70 },
+        { start: 900, end: 920, score: 96 },
+        { start: 1800, end: 1820, score: 84 },
+      ],
+      silences: [
+        { start: 300, end: 330 },
+        { start: 900, end: 930 },
+        { start: 1500, end: 1530 },
+        { start: 2100, end: 2130 },
+      ],
+      sourceDuration: 2700,
+      desiredDuration: 2400,
+      direction: "Create a forty-minute YouTube production and remove dead air",
+      tone: "natural",
+    });
+
+    expect(plan.strategy).toContain("long-form production");
+    expect(plan.requestedDuration).toBe(2400);
+    expect(plan.outputDuration).toBeCloseTo(2400, 2);
+    expect(plan.durationLocked).toBe(true);
+    expect(plan.reordered).toBe(false);
+    expect(plan.segments.length).toBeGreaterThan(1);
+    expect(plan.segments[0].role).toBe("hook");
+    expect(plan.segments.at(-1).role).toBe("close");
+    expect(plan.segments.every((segment, index) => index === 0 || segment.start >= plan.segments[index - 1].end)).toBe(true);
+  });
 });

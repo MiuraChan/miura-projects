@@ -7,8 +7,23 @@ claiming source-level history that does not exist.
 
 ## Current source
 
-### 0.2.2
+### 0.2.3
 
+This release makes requested production duration a hard requirement instead of
+a suggestion. Long-form edits now preserve chronology across distributed
+sections, validate the rendered file against the target, and stop with a useful
+error rather than silently returning a short clip. Grayfox also remembers the
+user, export folder, and project options for the next desktop session without
+retaining the source-video path.
+
+- Explicit target duration in minutes, plus natural-language requests such as
+  “give me 40 minutes”
+- Duration-locked long-form planning and post-render validation
+- Saved user, export folder, tone tokens, final use, direction, and target
+- 40-minute end-to-end production test from a 45-minute synthetic source
+- Resilient handling of damaged sections with clear user-facing warnings
+
+### 0.2.2
 This release renders distant timeline sections as isolated, validated clips
 before concatenation. It avoids decoder memory pressure on long videos, recovers
 usable sections from partially damaged sources, and reports skipped time ranges

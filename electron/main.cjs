@@ -9,6 +9,7 @@ const { createEditRenderer } = require("./edit-renderer.cjs");
 
 const execFileAsync = promisify(execFile);
 const isSmokeTest = process.env.GRAYFOX_SMOKE_TEST === "1";
+let smokeWorkspace = null;
 
 
 function cleanText(value, fallback = "", limit = 500) {
@@ -40,6 +41,7 @@ function cleanProject(project, exportPath) {
     source: cleanSource(project?.source || (project?.sourceName ? { name: project.sourceName } : null)),
     editor: {
       finalUse: cleanText(editor.finalUse, "Website / landing page", 100),
+      targetMinutes: Math.max(0, Number(editor.targetMinutes) || 0),
       direction: cleanText(editor.direction, "", 5000),
       tokens: Array.isArray(editor.tokens) ? editor.tokens.slice(0, 6).map((token) => cleanText(token, "", 60)).filter(Boolean) : [],
     },
@@ -72,7 +74,55 @@ function cleanWorkspace(payload) {
     ? payload.projects.slice(0, 100).map((project) => cleanProject(project, normalizedExportPath))
     : [];
   const currentProjectId = cleanText(payload.currentProjectId, "", 120) || projects[0]?.id || null;
-  return { version: 2, userName, exportPath: normalizedExportPath, profileImage, currentProjectId, projects };
+  return { version: 3, userName, exportPath: normalizedExportPath, profileImage, currentProjectId, projects };
+}
+
+function workspaceFilePath() {
+  return path.join(app.getPath("userData"), "grayfox-workspace.json");
+}
+
+function cleanWorkspaceForStorage(payload) {
+  const workspace = cleanWorkspace(payload);
+  return {
+    ...workspace,
+    projects: workspace.projects.map((project) => ({
+      ...project,
+      source: project.source ? {
+        name: project.source.name,
+        path: null,
+        size: 0,
+        lastModified: 0,
+        duration: project.source.duration,
+      } : null,
+      lastExportPath: null,
+    })),
+  };
+}
+
+async function loadWorkspaceFromDisk() {
+  try {
+    const raw = await fs.readFile(workspaceFilePath(), "utf8");
+    return cleanWorkspaceForStorage(JSON.parse(raw));
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    return null;
+  }
+}
+
+async function saveWorkspaceToDisk(payload) {
+  const workspace = cleanWorkspaceForStorage(payload);
+  const filePath = workspaceFilePath();
+  const temporaryPath = filePath + ".tmp";
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(temporaryPath, JSON.stringify(workspace, null, 2), "utf8");
+  try {
+    await fs.rename(temporaryPath, filePath);
+  } catch (error) {
+    if (error?.code !== "EPERM" && error?.code !== "EEXIST") throw error;
+    await fs.rm(filePath, { force: true });
+    await fs.rename(temporaryPath, filePath);
+  }
+  return workspace;
 }
 
 async function describeVideo(filePath) {
@@ -165,9 +215,14 @@ function registerWorkspaceIpc() {
     const result = await dialog.showOpenDialog({ title: "Choose where Grayfox exports your videos", buttonLabel: "Use this folder", properties: ["openDirectory", "createDirectory"] });
     return result.canceled ? null : result.filePaths[0];
   });
-  // Workspace data is session-only while onboarding and editing are being stabilized.
-  ipcMain.handle("workspace:load", async () => null);
-  ipcMain.handle("workspace:save", async (_event, payload) => cleanWorkspace(payload));
+  ipcMain.handle("workspace:load", async () => isSmokeTest ? smokeWorkspace : loadWorkspaceFromDisk());
+  ipcMain.handle("workspace:save", async (_event, payload) => {
+    if (isSmokeTest) {
+      smokeWorkspace = cleanWorkspaceForStorage(payload);
+      return smokeWorkspace;
+    }
+    return saveWorkspaceToDisk(payload);
+  });
   ipcMain.handle("video:choose", async () => {
     const result = await dialog.showOpenDialog({ title: "Choose a source video", buttonLabel: "Use this video", properties: ["openFile"], filters: [{ name: "Videos", extensions: ["mp4", "mov", "mkv", "webm", "m4v", "avi"] }] });
     return result.canceled ? null : describeVideo(result.filePaths[0]);
@@ -199,10 +254,10 @@ function createWindow() {
         hasVideoOps: Boolean(document.querySelector("#video-ops")),
         hasStoryClips: Boolean(document.querySelector("#shorts")),
         onboardingVisible: !document.querySelector("#workspace-modal").hidden,
-        persistenceDisabled: loadedWorkspace === null && window.name === "",
+        persistenceEnabled: loadedWorkspace?.userName === "Smoke" && /GrayfoxSmoke$/.test(loadedWorkspace?.exportPath || ""),
       };
     })()`);
-    const passed = result.hasApp && result.hasVideoOps && result.hasStoryClips && result.onboardingVisible && result.persistenceDisabled;
+    const passed = result.hasApp && result.hasVideoOps && result.hasStoryClips && result.onboardingVisible && result.persistenceEnabled;
     process.stdout.write(`GRAYFOX_SMOKE_${passed ? "OK" : "FAIL"} ${JSON.stringify(result)}\n`);
     if (passed) app.quit(); else app.exit(1);
   });
@@ -214,4 +269,4 @@ if (process.env.GRAYFOX_LIBRARY_MODE !== "1") {
   app.on("window-all-closed", () => { if (process.platform !== "darwin") app.quit(); });
 }
 
-module.exports = { analyzeVideo, cleanWorkspace, createWindow, describeVideo, probeDuration, produceEditedVideo, produceVideo, registerWorkspaceIpc, resolveMediaTool };
+module.exports = { analyzeVideo, cleanWorkspace, cleanWorkspaceForStorage, createWindow, describeVideo, loadWorkspaceFromDisk, probeDuration, produceEditedVideo, produceVideo, registerWorkspaceIpc, resolveMediaTool, saveWorkspaceToDisk, workspaceFilePath };

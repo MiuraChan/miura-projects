@@ -42,6 +42,141 @@ function trimSegmentsToDuration(segments, maximumDuration) {
   return output;
 }
 
+function mergeRanges(ranges) {
+  const sorted = ranges
+    .filter((range) => range.end - range.start > 0.01)
+    .map((range) => ({ start: range.start, end: range.end }))
+    .sort((a, b) => a.start - b.start);
+  const merged = [];
+  for (const range of sorted) {
+    const previous = merged.at(-1);
+    if (previous && range.start <= previous.end + 0.01) previous.end = Math.max(previous.end, range.end);
+    else merged.push({ ...range });
+  }
+  return merged;
+}
+
+function complementRanges(sourceDuration, removedRanges) {
+  const removed = mergeRanges(removedRanges);
+  const kept = [];
+  let cursor = 0;
+  for (const range of removed) {
+    const start = clamp(range.start, 0, sourceDuration);
+    const end = clamp(range.end, start, sourceDuration);
+    if (start - cursor >= 0.5) kept.push({ start: cursor, end: start, reason: "long-form-content" });
+    cursor = Math.max(cursor, end);
+  }
+  if (sourceDuration - cursor >= 0.5) kept.push({ start: cursor, end: sourceDuration, reason: "long-form-content" });
+  return kept;
+}
+
+function sliceSegmentsByContentTime(segments, startOffset, duration) {
+  const output = [];
+  let cursor = 0;
+  const selectionEnd = startOffset + duration;
+  for (const segment of segments) {
+    const segmentDuration = segment.end - segment.start;
+    const segmentStart = cursor;
+    const segmentEnd = cursor + segmentDuration;
+    const overlapStart = Math.max(segmentStart, startOffset);
+    const overlapEnd = Math.min(segmentEnd, selectionEnd);
+    if (overlapEnd - overlapStart >= 0.5) {
+      output.push({
+        ...segment,
+        start: Number((segment.start + overlapStart - segmentStart).toFixed(3)),
+        end: Number((segment.start + overlapEnd - segmentStart).toFixed(3)),
+      });
+    }
+    cursor = segmentEnd;
+    if (cursor >= selectionEnd) break;
+  }
+  return output;
+}
+
+function coalesceSegmentsToLimit(rawSegments, limit) {
+  const segments = rawSegments.map((segment) => ({ ...segment }));
+  while (segments.length > limit) {
+    let smallestGapIndex = 0;
+    let smallestGap = Infinity;
+    for (let index = 0; index < segments.length - 1; index += 1) {
+      const gap = segments[index + 1].start - segments[index].end;
+      if (gap < smallestGap) {
+        smallestGap = gap;
+        smallestGapIndex = index;
+      }
+    }
+    segments.splice(smallestGapIndex, 2, {
+      ...segments[smallestGapIndex],
+      end: segments[smallestGapIndex + 1].end,
+      reason: "coalesced-long-form-content",
+    });
+  }
+  return segments;
+}
+
+function assignRoles(segments) {
+  return segments.map((segment, index) => ({
+    ...segment,
+    role: index === 0 ? "hook" : (index === segments.length - 1 ? "close" : "body"),
+  }));
+}
+
+function buildLongFormSegments({ candidates, silences, sourceDuration, target, maximumSegments }) {
+  if (target >= sourceDuration - 0.05) {
+    return assignRoles([{ start: 0, end: sourceDuration, reason: "full-source-production" }]);
+  }
+
+  const ratio = target / sourceDuration;
+  const strongest = [...candidates].sort((a, b) => b.score - a.score)[0];
+  let segments;
+  if (ratio >= 0.65) {
+    let removalBudget = sourceDuration - target;
+    const removableSilences = silences
+      .map((silence) => ({ start: silence.start + 0.08, end: silence.end - 0.08 }))
+      .filter((silence) => silence.end - silence.start >= 0.45)
+      .sort((a, b) => (b.end - b.start) - (a.end - a.start));
+    const removals = [];
+    for (const silence of removableSilences) {
+      if (removalBudget <= 0.05) break;
+      const silenceDuration = silence.end - silence.start;
+      const removedDuration = Math.min(silenceDuration, removalBudget);
+      const center = (silence.start + silence.end) / 2;
+      removals.push({ start: center - removedDuration / 2, end: center + removedDuration / 2 });
+      removalBudget -= removedDuration;
+    }
+    const chronologicalContent = complementRanges(sourceDuration, removals);
+    const contentDuration = chronologicalContent.reduce((total, segment) => total + segment.end - segment.start, 0);
+    const anchor = strongest ? (strongest.start + strongest.end) / 2 : sourceDuration / 2;
+    let anchorOffset = 0;
+    for (const segment of chronologicalContent) {
+      if (anchor >= segment.end) anchorOffset += segment.end - segment.start;
+      else if (anchor > segment.start) { anchorOffset += anchor - segment.start; break; }
+      else break;
+    }
+    const selectionStart = clamp(anchorOffset - target * 0.15, 0, Math.max(0, contentDuration - target));
+    segments = sliceSegmentsByContentTime(chronologicalContent, selectionStart, target);
+  } else {
+    const chapterCount = clamp(Math.ceil(target / 300), 2, Math.min(12, maximumSegments));
+    const chapterDuration = sourceDuration / chapterCount;
+    const outputPerChapter = target / chapterCount;
+    segments = Array.from({ length: chapterCount }, (_value, index) => {
+      const chapterStart = index * chapterDuration;
+      const chapterEnd = index === chapterCount - 1 ? sourceDuration : (index + 1) * chapterDuration;
+      const candidate = candidates
+        .filter((item) => item.start < chapterEnd && item.end > chapterStart)
+        .sort((a, b) => b.score - a.score)[0];
+      const anchor = candidate ? (candidate.start + candidate.end) / 2 : (chapterStart + chapterEnd) / 2;
+      const latestStart = Math.max(chapterStart, chapterEnd - outputPerChapter);
+      const start = clamp(anchor - outputPerChapter / 2, chapterStart, latestStart);
+      return { start, end: Math.min(chapterEnd, start + outputPerChapter), reason: "chapter-selection" };
+    });
+  }
+
+  segments = coalesceSegmentsToLimit(mergeRanges(segments), maximumSegments);
+  segments = trimSegmentsToDuration(segments, target);
+  return assignRoles(segments);
+}
+
 function buildEditPlan({
   candidates,
   silences = [],
@@ -49,16 +184,32 @@ function buildEditPlan({
   desiredDuration,
   direction = "",
   tone = "",
-  maximumSegments = 8,
+  maximumSegments = 48,
 }) {
   const target = clamp(Number(desiredDuration) || sourceDuration, 2, sourceDuration);
+  if (target > 120) {
+    const segments = buildLongFormSegments({ candidates, silences, sourceDuration, target, maximumSegments });
+    const outputDuration = segments.reduce((total, segment) => total + (segment.end - segment.start), 0);
+    return {
+      strategy: `Duration-locked ${tone ? `${tone} ` : ""}long-form production`,
+      segments,
+      sourceDuration: Number(sourceDuration.toFixed(3)),
+      requestedDuration: Number(target.toFixed(3)),
+      outputDuration: Number(outputDuration.toFixed(3)),
+      removedDuration: Number(Math.max(0, sourceDuration - outputDuration).toFixed(3)),
+      reordered: false,
+      durationLocked: Math.abs(outputDuration - target) <= Math.max(1, target * 0.01),
+    };
+  }
+
   const ranked = [...candidates].sort((a, b) => b.score - a.score);
   const selectedWindows = [];
+  const shortSegmentLimit = Math.min(8, maximumSegments);
   for (const candidate of ranked) {
     if (selectedWindows.some((selected) => rangesOverlap(selected, candidate, 0.35))) continue;
     selectedWindows.push(candidate);
     const selectedDuration = selectedWindows.reduce((total, item) => total + (item.end - item.start), 0);
-    if (selectedDuration >= target * 1.35 || selectedWindows.length >= maximumSegments) break;
+    if (selectedDuration >= target * 1.35 || selectedWindows.length >= shortSegmentLimit) break;
   }
   if (!selectedWindows.length) selectedWindows.push({ start: 0, end: Math.min(sourceDuration, target), score: 0 });
 
@@ -78,22 +229,28 @@ function buildEditPlan({
       role: windowIndex === 0 ? "hook" : (windowIndex === orderedWindows.length - 1 ? "close" : "body"),
     })))
     .filter((segment) => segment.end - segment.start >= 0.5);
-  const segments = trimSegmentsToDuration(contentSegments, target).slice(0, maximumSegments);
+  const segments = trimSegmentsToDuration(contentSegments, target).slice(0, shortSegmentLimit);
   const outputDuration = segments.reduce((total, segment) => total + (segment.end - segment.start), 0);
   const coveredSpan = segments.length ? Math.max(...segments.map((segment) => segment.end)) - Math.min(...segments.map((segment) => segment.start)) : 0;
   return {
     strategy: `Direction-aware ${tone ? `${tone} ` : ""}multi-segment cut`,
     segments,
     sourceDuration: Number(sourceDuration.toFixed(3)),
+    requestedDuration: Number(target.toFixed(3)),
     outputDuration: Number(outputDuration.toFixed(3)),
     removedDuration: Number(Math.max(0, coveredSpan - outputDuration).toFixed(3)),
     reordered: segments.some((segment, index) => index > 0 && segment.start < segments[index - 1].start),
+    durationLocked: outputDuration >= target * 0.9,
   };
 }
 
 module.exports = {
   buildEditPlan,
+  buildLongFormSegments,
+  coalesceSegmentsToLimit,
+  complementRanges,
   rangesOverlap,
   removeSilencesFromRange,
+  sliceSegmentsByContentTime,
   trimSegmentsToDuration,
 };

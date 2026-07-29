@@ -6,6 +6,7 @@ const { app } = require("electron");
 
 process.env.GRAYFOX_LIBRARY_MODE = "1";
 const { produceEditedVideo, probeDuration, resolveMediaTool } = require("../electron/main.cjs");
+const { buildEditPlan } = require("../electron/edit-planner.cjs");
 
 const execFileAsync = promisify(execFile);
 
@@ -20,7 +21,7 @@ app.whenReady().then(async () => {
     const ffprobePath = await resolveMediaTool("ffprobe");
     await execFileAsync(ffmpegPath, [
       "-y",
-      "-f", "lavfi", "-i", "testsrc2=s=96x54:r=2:d=2245",
+      "-f", "lavfi", "-i", "testsrc2=s=96x54:r=2:d=2700",
       "-c:v", "libx264", "-preset", "ultrafast", "-crf", "32",
       "-g", "20", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an",
       sourcePath,
@@ -42,6 +43,36 @@ app.whenReady().then(async () => {
     const longDuration = await probeDuration(longResult.outputPath, ffprobePath);
     if (longResult.segmentCount !== 3 || longResult.skippedSegments.length !== 0 || Math.abs(longDuration - 8) > 0.35 || !progress.includes(100)) {
       throw new Error(`Long-distance edit failed: ${JSON.stringify({ longResult, longDuration, progress })}`);
+    }
+
+    const productionPlan = buildEditPlan({
+      candidates: [
+        { start: 100, end: 120, score: 72 },
+        { start: 900, end: 920, score: 96 },
+        { start: 1800, end: 1820, score: 84 },
+      ],
+      silences: [
+        { start: 300, end: 330 },
+        { start: 900, end: 930 },
+        { start: 1500, end: 1530 },
+        { start: 2100, end: 2130 },
+      ],
+      sourceDuration: 2700,
+      desiredDuration: 2400,
+      direction: "Produce a forty-minute edit and remove dead air",
+    });
+    const productionResult = await produceEditedVideo({
+      sender: { send: () => {} },
+    }, {
+      sourcePath,
+      exportPath,
+      projectName: "forty-minute-production",
+      expectedDuration: 2400,
+      segments: productionPlan.segments,
+    });
+    const productionDuration = await probeDuration(productionResult.outputPath, ffprobePath);
+    if (!productionResult.meetsTarget || Math.abs(productionDuration - 2400) > 2 || productionResult.segmentCount < 2) {
+      throw new Error(`Forty-minute production failed: ${JSON.stringify({ productionPlan, productionResult, productionDuration })}`);
     }
 
     await fs.copyFile(sourcePath, damagedPath);
@@ -72,6 +103,9 @@ app.whenReady().then(async () => {
       sourceDuration: longResult.sourceDuration,
       longOutputDuration: longDuration,
       longSegments: longResult.segmentCount,
+      productionDuration,
+      productionSegments: productionResult.segmentCount,
+      productionMeetsTarget: productionResult.meetsTarget,
       recoveredDuration,
       recoveredSegments: damagedResult.segmentCount,
       skippedSegments: damagedResult.skippedSegments.length,

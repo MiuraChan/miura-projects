@@ -7,19 +7,21 @@ claiming source-level history that does not exist.
 
 ## Current source
 
-### 0.2.1
+### 0.2.2
 
-This is the first release built directly from the tracked Git source. It uses
-the locally installed and tested Electron distribution during packaging, so a
-certificate failure while downloading Electron cannot block the Windows build.
+This release renders distant timeline sections as isolated, validated clips
+before concatenation. It avoids decoder memory pressure on long videos, recovers
+usable sections from partially damaged sources, and reports skipped time ranges
+instead of exposing raw FFmpeg errors. Packaging uses the locally installed and
+tested Electron distribution.
 
 - Electron desktop application and responsive browser preview
 - Session-only onboarding and workspace configuration
 - Profile image approval/rejection feedback
 - Local Qwen3-VL candidate analysis through Ollama
-- FFmpeg scene, silence, trim, multi-segment editing, and MP4 rendering
+- Resilient FFmpeg scene, silence, trim, isolated-segment editing, and MP4 rendering
 - Story Clip ranking, meme signal, preview, and export
-- Automated UI, Electron, FFmpeg, edit, and local-AI integration tests
+- Automated UI, Electron, FFmpeg, long-video, damaged-source, edit, and local-AI integration tests
 
 ## Archived Windows builds
 

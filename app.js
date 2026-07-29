@@ -727,7 +727,15 @@ function createGrayfoxApp(doc, win) {
       }
       completeFirstCut(result);
       if (editPlan?.segments?.length > 1) {
-        elements.processingCuriosity.textContent = `${editPlan.segments.length} source sections concatenated · ${result.duration.toFixed(1)}s output · ${result.removedDuration.toFixed(1)}s removed. Saved to ${result.outputPath}`;
+        const skippedCount = result.skippedSegments?.length || 0;
+        if (skippedCount) {
+          elements.processingTitle.textContent = "First cut ready with a source warning";
+          elements.processingEta.textContent = `${result.segmentCount}/${result.requestedSegmentCount} sections rendered`;
+          elements.processingCuriosity.textContent = `${result.segmentCount} sections rendered · ${skippedCount} damaged or incomplete section${skippedCount === 1 ? " was" : "s were"} skipped. Saved to ${result.outputPath}`;
+          showToast(`First cut ready. ${skippedCount} damaged source section${skippedCount === 1 ? " was" : "s were"} skipped.`);
+        } else {
+          elements.processingCuriosity.textContent = `${result.segmentCount} source sections concatenated · ${result.duration.toFixed(1)}s output · ${result.removedDuration.toFixed(1)}s removed. Saved to ${result.outputPath}`;
+        }
       } else if (state.analysis?.candidates?.[0]) {
         const best = state.analysis.candidates[0];
         elements.processingCuriosity.textContent = `${best.title}: ${best.note} Saved to ${result.outputPath}`;

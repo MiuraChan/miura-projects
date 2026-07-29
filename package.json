@@ -1,6 +1,6 @@
 {
   "name": "grayfox-video-studio",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Local-first AI video editing and Story Clips desktop prototype",
   "main": "electron/main.cjs",
   "author": "Grayfox",
@@ -12,11 +12,12 @@
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "test:electron": "node scripts/electron-smoke.cjs",
-    "test:all": "npm run test && npm run test:electron && npm run test:ffmpeg && npm run test:edit && npm run test:ai",
+    "test:all": "npm run test && npm run test:electron && npm run test:ffmpeg && npm run test:edit && npm run test:edit-resilience && npm run test:ai",
     "dist": "npm run test:all && electron-builder --win portable",
     "test:ffmpeg": "electron scripts/ffmpeg-integration.cjs",
     "test:ai": "electron scripts/local-ai-integration.cjs",
-    "test:edit": "electron scripts/edit-integration.cjs"
+    "test:edit": "electron scripts/edit-integration.cjs",
+    "test:edit-resilience": "electron scripts/edit-resilience-integration.cjs"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^3.2.4",

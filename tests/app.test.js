@@ -300,6 +300,46 @@ describe("Video and AI brief workflow", () => {
     expect(result.segmentCount).toBe(3);
   });
 
+  it("keeps a usable first cut and warns when damaged source sections are skipped", async () => {
+    const desktop = {
+      chooseExportPath: vi.fn(),
+      analyzeVideo: vi.fn().mockResolvedValue({
+        candidates: [{ start: 1, end: 3, score: 90, title: "Hook" }],
+        editPlan: {
+          segments: [
+            { start: 1, end: 3, role: "hook" },
+            { start: 2226, end: 2230, role: "close" },
+          ],
+        },
+      }),
+      produceEditedVideo: vi.fn().mockResolvedValue({
+        outputPath: "C:/Exports/recovered.mp4",
+        duration: 2,
+        segmentCount: 1,
+        requestedSegmentCount: 2,
+        removedDuration: 2243,
+        skippedSegments: [{ start: 2226, end: 2230, reason: "Source section is incomplete or damaged." }],
+      }),
+      produceVideo: vi.fn(),
+      restoreVideo: vi.fn().mockResolvedValue({ url: "file:///C:/Exports/recovered.mp4" }),
+      onProductionProgress: vi.fn(() => vi.fn()),
+    };
+    const { document, app } = setup("https://grayfox.local/", desktop);
+    await app.ready;
+    document.querySelector("#workspace-user-name").value = "Marco";
+    document.querySelector("#workspace-export-path").value = "C:/Exports";
+    await app.createWorkspace();
+    app.loadVideo({ name: "damaged.mp4", path: "C:/Videos/damaged.mp4", url: "file:///C:/Videos/damaged.mp4", size: 1000, duration: 2245 });
+
+    const result = await app.createFirstCut();
+
+    expect(result.segmentCount).toBe(1);
+    expect(result.skippedSegments).toHaveLength(1);
+    expect(document.querySelector("#processing-title").textContent).toBe("First cut ready with a source warning");
+    expect(document.querySelector("#processing-eta").textContent).toBe("1/2 sections rendered");
+    expect(document.querySelector("#processing-curiosity").textContent).toContain("1 damaged or incomplete section was skipped");
+    expect(document.querySelector("#video-preview").src).toBe("file:///C:/Exports/recovered.mp4");
+  });
   it("persists the latest replacement video and every editor field", async () => {
     const { document, window, app } = setup("file:///C:/Grayfox/index.html");
     await app.ready;

@@ -1,6 +1,6 @@
 {
   "name": "grayfox-video-studio",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Local-first AI video editing and Story Clips desktop prototype",
   "main": "electron/main.cjs",
   "author": "Grayfox",
@@ -46,6 +46,7 @@
         "portable"
       ],
       "artifactName": "Grayfox-${version}-Windows.${ext}"
-    }
+    },
+    "electronDist": "node_modules/electron/dist"
   }
 }

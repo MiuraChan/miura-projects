@@ -7,7 +7,11 @@ claiming source-level history that does not exist.
 
 ## Current source
 
-### 0.2.0 development state
+### 0.2.1
+
+This is the first release built directly from the tracked Git source. It uses
+the locally installed and tested Electron distribution during packaging, so a
+certificate failure while downloading Electron cannot block the Windows build.
 
 - Electron desktop application and responsive browser preview
 - Session-only onboarding and workspace configuration

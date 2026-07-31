@@ -488,10 +488,30 @@ function createGrayfoxApp(doc, win) {
   async function chooseVideoSource() {
     if (desktop?.chooseVideo) {
       const descriptor = await desktop.chooseVideo();
-      if (descriptor) loadVideo(descriptor);
+      if (descriptor) {
+        loadVideo(descriptor);
+        return descriptor;
+      }
     } else {
       elements.input.click();
     }
+    return null;
+  }
+
+  async function ensureRenderableSource(kind = "Video") {
+    if (!desktop?.produceVideo) {
+      showToast(`${kind} rendering works in the Grayfox desktop app, not the browser preview.`);
+      return false;
+    }
+    if (state.source?.path) return true;
+    const previousName = state.source?.name || state.file?.name || "the source video";
+    showToast(`Reconnect “${previousName}” to continue rendering.`);
+    const descriptor = await chooseVideoSource();
+    if (!descriptor?.path) {
+      showToast("Rendering paused. Choose the source video when you are ready.");
+      return false;
+    }
+    return true;
   }
 
   elements.choose.addEventListener("click", chooseVideoSource);
@@ -721,10 +741,7 @@ function createGrayfoxApp(doc, win) {
       showToast("Add a video before creating the first cut.");
       return null;
     }
-    if (!state.source.path || !desktop?.produceVideo) {
-      showToast("First cut rendering works in the Grayfox desktop app, not the browser preview.");
-      return null;
-    }
+    if (!await ensureRenderableSource("First cut")) return null;
     if (!state.workspace?.exportPath) {
       showToast("Choose an export folder in workspace settings first.");
       return null;
@@ -958,10 +975,7 @@ function createGrayfoxApp(doc, win) {
   async function renderStoryClip(index) {
     const clip = clipData[Number(index)];
     if (!clip) return null;
-    if (!state.source?.path || !desktop?.produceVideo) {
-      showToast("Clip rendering works in the Grayfox desktop app, not the browser preview.");
-      return null;
-    }
+    if (!await ensureRenderableSource("Clip")) return null;
     if (!state.workspace?.exportPath) {
       showToast("Choose an export folder in workspace settings first.");
       return null;
@@ -1008,10 +1022,7 @@ function createGrayfoxApp(doc, win) {
       showToast("Add a video before exporting.");
       return null;
     }
-    if (!state.source.path || !desktop?.produceVideo) {
-      showToast("Open the Grayfox desktop app to render this saved project.");
-      return null;
-    }
+    if (!await ensureRenderableSource("Export")) return null;
     elements.exportButton.disabled = true;
     elements.productionStatus.hidden = false;
     elements.productionTitle.textContent = "Producing video";
@@ -1077,6 +1088,7 @@ function createGrayfoxApp(doc, win) {
     estimateFirstCutSeconds,
     parseRequestedDurationSeconds,
     requestedProductionSeconds,
+    ensureRenderableSource,
     setProfileImage,
     readBrowserWorkspace,
     restoreProject,

@@ -7,8 +7,26 @@ claiming source-level history that does not exist.
 
 ## Current source
 
-### 0.2.3
+### 0.2.4
 
+This is the one-time updater-enabled Windows build. Its stable launcher can load
+checksum-verified local runtime bundles on restart, fall back to the packaged
+runtime if validation fails, and roll back to the previous deployed build.
+Future producer-test changes can therefore be applied without rebuilding the
+portable installer.
+
+This release also fixes saved projects being incorrectly described as a browser
+preview. When a remembered project has no retained source path, Electron now
+opens the video picker, reconnects the source, and continues the requested first
+cut, Story Clip, or export.
+
+- Stable launcher with atomic runtime activation
+- SHA-256 verification and packaged-runtime fallback
+- One-command local deployment and rollback
+- Automatic source reconnection before real FFmpeg rendering
+- No GitHub credential embedded in the application
+
+### 0.2.3
 This release makes requested production duration a hard requirement instead of
 a suggestion. Long-form edits now preserve chronology across distributed
 sections, validate the rendered file against the target, and stop with a useful

@@ -2,6 +2,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const projectRoot = path.join(__dirname, "..");
 const mainSource = fs.readFileSync(path.join(projectRoot, "electron", "main.cjs"), "utf8");
+const bootstrapSource = fs.readFileSync(path.join(projectRoot, "electron", "bootstrap.cjs"), "utf8");
+const runtimeLoaderSource = fs.readFileSync(path.join(projectRoot, "electron", "runtime-loader.cjs"), "utf8");
 const preloadSource = fs.readFileSync(path.join(projectRoot, "electron", "preload.cjs"), "utf8");
 const stylesSource = fs.readFileSync(path.join(projectRoot, "styles.css"), "utf8");
 const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, "package.json"), "utf8"));
@@ -52,7 +54,10 @@ describe("Electron production configuration", () => {
     expect(preloadSource).toContain('ipcRenderer.invoke("video:analyze", options)');
   });
   it("packages the required renderer and Electron files", () => {
-    expect(packageJson.main).toBe("electron/main.cjs");
+    expect(packageJson.main).toBe("electron/bootstrap.cjs");
+    expect(bootstrapSource).toContain("selectRuntime");
+    expect(runtimeLoaderSource).toContain("validateRuntime");
+    expect(packageJson.scripts["deploy:update-local"]).toContain("deploy-local-update.cjs");
     expect(packageJson.build.files).toEqual(expect.arrayContaining([
       "index.html",
       "styles.css",

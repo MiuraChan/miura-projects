@@ -4,7 +4,7 @@ Local-first Windows video editor for direction-aware first cuts, ranked Story Cl
 
 ## Runtime
 
-- Grayfox keeps workspace/profile/project data in memory only; onboarding appears on every launch.
+- Grayfox persists the user, export folder, profile, and project options locally. Source-video paths are intentionally reconnected on demand.
 - FFmpeg and FFprobe perform scene/audio analysis and render H.264/AAC MP4 files.
 - Ollama with `qwen3-vl:2b-instruct` evaluates sampled video frames locally. No OpenAI key is required.
 - If Ollama is unavailable, Grayfox labels and uses its measured scene/silence fallback instead of inventing an AI result.
@@ -14,12 +14,23 @@ Local-first Windows video editor for direction-aware first cuts, ranked Story Cl
 - `npm start` — run the Electron app
 - `npm run preview` — open a local HTTP preview server on port 4177 (UI only)
 - `npm test` — interaction, security configuration, local-ranking and meme-score tests
-- `npm run test:electron` — launch a hidden Electron window and verify onboarding plus zero persistence
+- `npm run test:electron` — launch a hidden Electron window and verify onboarding, the desktop bridge, and preference persistence
 - `npm run test:ffmpeg` — create three real MP4 cuts and verify duration/codecs
 - `npm run test:edit` — concatenate three non-contiguous source sections and verify the rendered MP4
 - `npm run test:ai` — generate a video, analyze it with local Qwen3-VL, render the selected range, and verify it with FFprobe
 - `npm run test:all` — run all of the above
 - `npm run dist` — run the complete suite and build the Windows portable executable
+- `npm run deploy:update-local` — atomically deploy a checksum-verified runtime update; restart Grayfox to activate it
+- `npm run rollback:update-local` — switch the local runtime pointer back to the previous deployed build
+
+## Installer and local updates
+
+Grayfox 0.2.4 introduces a stable launcher. Install an updater-enabled build once;
+subsequent producer-test changes can be deployed as small runtime bundles without
+rebuilding the Windows executable. The launcher verifies every bundled file
+against its SHA-256 manifest and falls back to the packaged runtime if validation
+fails. Local updates never contain a GitHub token. A signed remote feed can be
+connected later for end-user distribution.
 
 ## Implemented workflows
 

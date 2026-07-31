@@ -188,6 +188,29 @@ describe("Video and AI brief workflow", () => {
     expect(document.querySelector("#processing-panel").hidden).toBe(true);
   });
 
+  it("reconnects a remembered source inside Electron before rendering", async () => {
+    const desktop = {
+      chooseExportPath: vi.fn(),
+      chooseVideo: vi.fn().mockResolvedValue({ name: "interview.mp4", path: "C:/Videos/interview.mp4", url: "file:///C:/Videos/interview.mp4", duration: 60 }),
+      produceVideo: vi.fn().mockResolvedValue({ outputPath: "C:/Exports/reconnected.mp4", duration: 45 }),
+      restoreVideo: vi.fn().mockResolvedValue({ url: "file:///C:/Exports/reconnected.mp4" }),
+      onProductionProgress: vi.fn(() => vi.fn()),
+    };
+    const { document, app } = setup("https://grayfox.local/", desktop);
+    await app.ready;
+    document.querySelector("#workspace-user-name").value = "Marco";
+    document.querySelector("#workspace-export-path").value = "C:/Exports";
+    await app.createWorkspace();
+    app.loadVideo({ name: "interview.mp4", path: null, url: "file:///remembered/interview.mp4", duration: 60 });
+
+    const result = await app.createFirstCut();
+
+    expect(desktop.chooseVideo).toHaveBeenCalledOnce();
+    expect(desktop.produceVideo).toHaveBeenCalledWith(expect.objectContaining({ sourcePath: "C:/Videos/interview.mp4" }));
+    expect(result.outputPath).toBe("C:/Exports/reconnected.mp4");
+    expect(document.querySelector("#toast").textContent).not.toContain("browser preview");
+  });
+
   it("renders a real first cut through the desktop FFmpeg bridge", async () => {
     let progressCallback;
     const desktop = {
@@ -546,7 +569,7 @@ describe("Story Clips and export workflows", () => {
     app.loadVideo(videoFile(window));
     document.querySelector("#export-button").click();
     expect(document.querySelector("#toast").textContent)
-      .toBe("Open the Grayfox desktop app to render this saved project.");
+      .toBe("Export rendering works in the Grayfox desktop app, not the browser preview.");
   });
 });
 

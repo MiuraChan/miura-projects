@@ -1,14 +1,16 @@
 {
   "name": "grayfox-video-studio",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Local-first AI video editing and Story Clips desktop prototype",
-  "main": "electron/main.cjs",
+  "main": "electron/bootstrap.cjs",
   "author": "Grayfox",
   "license": "UNLICENSED",
   "private": true,
   "scripts": {
     "start": "electron .",
     "preview": "node scripts/preview-server.cjs",
+    "deploy:update-local": "electron scripts/deploy-local-update.cjs",
+    "rollback:update-local": "electron scripts/rollback-local-update.cjs",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "test:electron": "node scripts/electron-smoke.cjs",

@@ -16,5 +16,5 @@ contextBridge.exposeInMainWorld("grayfoxDesktop", Object.freeze({
     ipcRenderer.on("video:production-progress", listener);
     return () => ipcRenderer.removeListener("video:production-progress", listener);
   },
-  versions: Object.freeze({ chrome: process.versions.chrome, electron: process.versions.electron })
+  versions: Object.freeze({ chrome: process.versions.chrome, electron: process.versions.electron, app: process.env.GRAYFOX_RUNTIME_VERSION || "unknown", build: process.env.GRAYFOX_RUNTIME_BUILD || "packaged", channel: process.env.GRAYFOX_UPDATE_CHANNEL || "packaged" })
 }));

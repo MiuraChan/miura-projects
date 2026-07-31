@@ -43,6 +43,101 @@ function parseSilences(log, duration) {
   return starts.map((start, index) => ({ start, end: Number.isFinite(ends[index]) ? ends[index] : duration }));
 }
 
+function parseSubtitleTime(value) {
+  const match = String(value || "").trim().match(/(?:(\d+):)?(\d{1,2}):(\d{2})[,.](\d{3})/);
+  if (!match) return null;
+  return (Number(match[1] || 0) * 3600) + (Number(match[2]) * 60) + Number(match[3]) + (Number(match[4]) / 1000);
+}
+
+function parseSubtitleCues(text) {
+  const normalized = String(text || "").replace(/\r/g, "").replace(/^WEBVTT[^\n]*\n+/i, "");
+  return normalized.split(/\n{2,}/).map((block) => {
+    const lines = block.split("\n").filter(Boolean);
+    const timingIndex = lines.findIndex((line) => line.includes("-->"));
+    if (timingIndex < 0) return null;
+    const [rawStart, rawEnd] = lines[timingIndex].split("-->").map((value) => value.trim().split(/\s+/)[0]);
+    const start = parseSubtitleTime(rawStart);
+    const end = parseSubtitleTime(rawEnd);
+    const cueText = lines.slice(timingIndex + 1).join(" ").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+    return Number.isFinite(start) && Number.isFinite(end) && end > start && cueText ? { start, end, text: cueText } : null;
+  }).filter(Boolean);
+}
+
+function directionKeywords(direction) {
+  const stop = new Set(["about", "after", "again", "alla", "anche", "before", "complete", "con", "conversation", "cut", "dialogue", "dopo", "end", "final", "finish", "full", "keep", "mantieni", "montaggio", "open", "prima", "remove", "risposta", "start", "the", "this", "video", "with", "without"]);
+  return [...new Set(String(direction || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").match(/[a-z0-9]{4,}/g) || [])]
+    .filter((word) => !stop.has(word))
+    .slice(0, 16);
+}
+
+function applyDialogueContext(candidates, dialogueCues, direction) {
+  const keywords = directionKeywords(direction);
+  for (const candidate of candidates) {
+    const cues = dialogueCues.filter((cue) => overlapSeconds(candidate.start, candidate.end, cue.start, cue.end) > 0);
+    const excerpt = cues.map((cue) => cue.text).join(" ").replace(/\s+/g, " ").trim().slice(0, 320);
+    const normalized = excerpt.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const matches = keywords.filter((keyword) => normalized.includes(keyword));
+    candidate.dialogueExcerpt = excerpt || null;
+    candidate.dialogueMatches = matches;
+    if (matches.length) {
+      candidate.score = clamp(candidate.score + Math.min(40, 22 + (matches.length * 8)), 1, 100);
+      candidate.note = `${candidate.note} · direction dialogue match: ${matches.join(", ")}`;
+    } else if (excerpt) {
+      candidate.score = clamp(candidate.score + 3, 1, 100);
+    }
+  }
+  return candidates.sort((a, b) => b.score - a.score);
+}
+
+async function loadDialogueCues(sourcePath, ffmpegPath, temporaryDirectory, explicitTranscriptPath = null) {
+  if (explicitTranscriptPath) {
+    try {
+      const transcriptExtension = path.extname(explicitTranscriptPath).toLowerCase();
+      if (![".srt", ".vtt"].includes(transcriptExtension)) throw new Error("Only .srt and .vtt transcripts are supported.");
+      const cues = parseSubtitleCues(await fs.readFile(explicitTranscriptPath, "utf8"));
+      if (cues.length) return { provider: `attached-${transcriptExtension.slice(1)}`, cues, fallbackReason: null };
+      throw new Error("No timed dialogue cues were found.");
+    } catch (error) {
+      return { provider: "speech-activity-only", cues: [], fallbackReason: `Attached transcript failed: ${error.message}` };
+    }
+  }
+  const parsed = path.parse(sourcePath);
+  for (const extension of [".srt", ".vtt"]) {
+    const sidecarPath = path.join(parsed.dir, `${parsed.name}${extension}`);
+    try {
+      const cues = parseSubtitleCues(await fs.readFile(sidecarPath, "utf8"));
+      if (cues.length) return { provider: `sidecar-${extension.slice(1)}`, cues, fallbackReason: null };
+    } catch { /* Try embedded subtitles next. */ }
+  }
+  try {
+    const { stdout } = await execFileAsync(ffmpegPath, ["-hide_banner", "-loglevel", "error", "-i", sourcePath, "-map", "0:s:0", "-f", "srt", "-"], { windowsHide: true, maxBuffer: 12 * 1024 * 1024 });
+    const cues = parseSubtitleCues(stdout);
+    if (cues.length) return { provider: "embedded-subtitles", cues, fallbackReason: null };
+  } catch { /* No embedded subtitle stream. */ }
+
+  const whisperPath = process.env.GRAYFOX_WHISPER_PATH;
+  const whisperModel = process.env.GRAYFOX_WHISPER_MODEL;
+  if (whisperPath && whisperModel) {
+    try {
+      await fs.mkdir(temporaryDirectory, { recursive: true });
+      const audioPath = path.join(temporaryDirectory, "dialogue.wav");
+      const outputBase = path.join(temporaryDirectory, "whisper-dialogue");
+      await execFileAsync(ffmpegPath, ["-y", "-i", sourcePath, "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", audioPath], { windowsHide: true, timeout: 600000 });
+      await execFileAsync(whisperPath, ["-m", whisperModel, "-f", audioPath, "-oj", "-of", outputBase], { windowsHide: true, timeout: 3600000, maxBuffer: 4 * 1024 * 1024 });
+      const payload = JSON.parse(await fs.readFile(`${outputBase}.json`, "utf8"));
+      const cues = (payload.transcription || payload.segments || []).map((item) => ({
+        start: Number(item.offsets?.from ?? item.start ?? 0) / (item.offsets?.from != null ? 1000 : 1),
+        end: Number(item.offsets?.to ?? item.end ?? 0) / (item.offsets?.to != null ? 1000 : 1),
+        text: String(item.text || "").trim(),
+      })).filter((cue) => cue.text && cue.end > cue.start);
+      if (cues.length) return { provider: "whisper-local", cues, fallbackReason: null };
+    } catch (error) {
+      return { provider: "speech-activity-only", cues: [], fallbackReason: `Local Whisper failed: ${error.message}` };
+    }
+  }
+  return { provider: "speech-activity-only", cues: [], fallbackReason: "No subtitles or configured local Whisper model were available." };
+}
+
 function buildSignalCandidates({
   duration,
   targetLength,
@@ -51,6 +146,7 @@ function buildSignalCandidates({
   tone = "",
   finalUse = "",
   direction = "",
+  dialogueCues = [],
   limit = 8,
 }) {
   const length = clamp(Number(targetLength) || 30, 3, duration);
@@ -59,7 +155,9 @@ function buildSignalCandidates({
     ? [0]
     : Array.from({ length: 8 }, (_value, index) => latestStart * (index / 7));
   const sceneStarts = sceneTimes.map((time) => clamp(time - Math.min(2, length * 0.08), 0, latestStart));
-  const starts = [...new Set([...regular, ...sceneStarts].map((value) => Number(value.toFixed(1))))]
+  const keywords = directionKeywords(direction);
+  const dialogueStarts = dialogueCues.filter((cue) => !keywords.length || keywords.some((keyword) => cue.text.toLowerCase().includes(keyword))).map((cue) => clamp(cue.start - Math.min(2, length * 0.12), 0, latestStart));
+  const starts = [...new Set([...regular, ...sceneStarts, ...dialogueStarts].map((value) => Number(value.toFixed(1))))]
     .sort((a, b) => a - b)
     .filter((value, index, values) => index === 0 || value - values[index - 1] >= Math.min(2, length * 0.12));
   const brief = `${tone} ${finalUse} ${direction}`.toLowerCase();
@@ -67,7 +165,7 @@ function buildSignalCandidates({
   const calm = /(warm|premium|calm|cinematic|elegant|thoughtful|emotional)/.test(brief);
   const direct = /(direct|concise|short|clear|helpful|tutorial|result|reveal|hook)/.test(brief);
 
-  return starts.map((start) => {
+  const ranked = starts.map((start) => {
     const end = Math.min(duration, start + length);
     const actualLength = end - start;
     const cuts = sceneTimes.filter((time) => time >= start && time < end).length;
@@ -104,7 +202,8 @@ function buildSignalCandidates({
         ? "Strong visual-change and reaction-window signal."
         : "Moderate meme signal; review the visual beat.",
     };
-  }).sort((a, b) => b.score - a.score).slice(0, limit);
+  });
+  return applyDialogueContext(ranked, dialogueCues, direction).slice(0, limit);
 }
 
 async function extractCandidateFrames(sourcePath, candidates, ffmpegPath, temporaryDirectory) {
@@ -138,7 +237,7 @@ async function requestOllamaVision(candidates, images, brief) {
         content: `You are Grayfox, a practical video editor. Rank these candidate frames for this brief: ${brief || "find the strongest self-contained moment"}.
 Image order matches candidate indexes ${candidates.map((_candidate, index) => index).join(", ")}.
 Return JSON only: {"rankings":[{"index":0,"semanticScore":0,"memeScore":0,"title":"short factual title","rationale":"one grounded sentence","memeReason":"one sentence about reaction face, irony, punchline, or text-overlay potential"}]}.
-Use scores from 0 to 100. Do not invent dialogue or audio. Evaluate visible subject, action, emotion, clarity, hook, brand safety, and meme potential.`,
+Use scores from 0 to 100. Never invent dialogue or audio. When the brief includes dialogue evidence, use only that supplied text. Evaluate visible subject, action, emotion, clarity, hook, direction match, brand safety, and meme potential.`,
         images,
       }],
     }),
@@ -179,6 +278,16 @@ function createLocalAi({ resolveMediaTool, probeDuration, cleanText }) {
     ]);
     const sceneTimes = parseSceneTimes(sceneResult.stderr);
     const silences = parseSilences(silenceResult.stderr, duration);
+    const temporaryDirectory = path.join(app.getPath("temp"), `grayfox-analysis-${process.pid}-${Date.now()}`);
+    const direction = cleanText(payload?.direction, "", 5000);
+    const dialogue = await loadDialogueCues(
+      sourcePath,
+      ffmpegPath,
+      temporaryDirectory,
+      cleanText(payload?.transcriptPath, "", 2000) || null
+    );
+    const preserveNaturalPauses = /(keep|preserve|natural|mantieni|conserva).{0,24}(pause|pauses|silence|silenzi|pause)/i.test(direction);
+    const editingSilences = preserveNaturalPauses ? silences.filter((silence) => silence.end - silence.start >= 2.5) : silences;
     const candidates = buildSignalCandidates({
       duration,
       targetLength: candidateLength,
@@ -186,9 +295,9 @@ function createLocalAi({ resolveMediaTool, probeDuration, cleanText }) {
       silences,
       tone: cleanText(payload?.tone, "", 500),
       finalUse: cleanText(payload?.finalUse, "", 100),
-      direction: cleanText(payload?.direction, "", 5000),
+      direction,
+      dialogueCues: dialogue.cues,
     });
-    const temporaryDirectory = path.join(app.getPath("temp"), `grayfox-analysis-${process.pid}-${Date.now()}`);
     let provider = "local-signals";
     let model = null;
     let fallbackReason = null;
@@ -197,7 +306,7 @@ function createLocalAi({ resolveMediaTool, probeDuration, cleanText }) {
       const vision = await requestOllamaVision(
         candidates,
         images,
-        `${payload?.finalUse || ""}; ${payload?.tone || ""}; ${payload?.direction || ""}`
+        `${payload?.finalUse || ""}; ${payload?.tone || ""}; ${direction}; dialogue evidence: ${candidates.map((candidate, index) => `${index}: ${candidate.dialogueExcerpt || "none"}`).join(" | ")}`
       );
       provider = "ollama-vision";
       model = vision.model;
@@ -223,10 +332,11 @@ function createLocalAi({ resolveMediaTool, probeDuration, cleanText }) {
     }
     const editPlan = mode === "edit" ? buildEditPlan({
       candidates,
-      silences,
+      silences: editingSilences,
+      dialogueCues: dialogue.cues,
       sourceDuration: duration,
       desiredDuration: targetLength,
-      direction: cleanText(payload?.direction, "", 5000),
+      direction,
       tone: cleanText(payload?.tone, "", 500),
     }) : null;
     return {
@@ -236,6 +346,9 @@ function createLocalAi({ resolveMediaTool, probeDuration, cleanText }) {
       model,
       editPlan,
       fallbackReason,
+      dialogueProvider: dialogue.provider,
+      dialogueCueCount: dialogue.cues.length,
+      dialogueFallbackReason: dialogue.fallbackReason,
       sceneCount: sceneTimes.length,
       silenceCount: silences.length,
       candidates: candidates.slice(0, 3),
@@ -248,7 +361,11 @@ function createLocalAi({ resolveMediaTool, probeDuration, cleanText }) {
 module.exports = {
   buildSignalCandidates,
   createLocalAi,
+  applyDialogueContext,
+  directionKeywords,
+  loadDialogueCues,
   parseSceneTimes,
   parseSilences,
+  parseSubtitleCues,
   requestOllamaVision,
 };

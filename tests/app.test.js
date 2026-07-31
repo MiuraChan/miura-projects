@@ -43,7 +43,7 @@ describe("Grayfox initial state and routing", () => {
   it("uses the live red signal without ninja icons", () => {
     const { document } = setup();
     expect(document.querySelector('[data-testid="grayfox-brand"] img')).toBeNull();
-    expect(document.querySelector('[data-testid="grayfox-brand"]').classList.contains("brand-art")).toBe(true);
+    expect(document.querySelector('[data-testid="grayfox-brand"]').classList.contains("brand-art")).toBe(false);
     expect(document.querySelector('.ai-glyph img')).toBeNull();
     expect(document.querySelector('.modal-grayfox-id')).toBeNull();
     expect(document.querySelector('.brand-signal[role="status"]').getAttribute("aria-label"))
@@ -454,6 +454,73 @@ describe("Video and AI brief workflow", () => {
   });
 });
 
+describe("First cut approval and handoff", () => {
+  it("guards review decisions and handoffs until a rendered cut exists", async () => {
+    const { document, app } = setup();
+    app.updateReviewPanel();
+    expect(document.querySelector("#review-panel").hidden).toBe(true);
+    expect(app.firstCutCount()).toBe(0);
+    expect(app.firstCutCount({ editPlan: { segments: [{}, {}] } })).toBe(2);
+    expect(app.firstCutCount({ outputPath: "cut.mp4" })).toBe(1);
+    expect(await app.approveFirstCut()).toBe(false);
+    expect(app.requestFirstCutChanges()).toBe(false);
+    expect(await app.renderRevision()).toBeNull();
+    expect(await app.createApprovedHandoff()).toBeNull();
+  });
+
+  it("shows cut count, requires approval, records revision feedback, and creates a handoff", async () => {
+    const desktop = {
+      loadWorkspace: vi.fn().mockResolvedValue(null),
+      saveWorkspace: vi.fn(async (workspace) => workspace),
+      chooseExportPath: vi.fn(),
+      chooseTranscript: vi.fn().mockResolvedValue({ name: "interview.srt", path: "C:/Videos/interview.srt" }),
+      analyzeVideo: vi.fn().mockResolvedValue({
+        provider: "local-signals",
+        dialogueProvider: "embedded-subtitles",
+        dialogueCueCount: 4,
+        targetLength: 12,
+        candidates: [{ start: 2, end: 14, score: 90, title: "Answer" }],
+        editPlan: { segments: [{ start: 2, end: 8, role: "hook" }, { start: 10, end: 16, role: "close" }] },
+      }),
+      produceEditedVideo: vi.fn().mockResolvedValue({ outputPath: "C:/Exports/review.mp4", duration: 12, segmentCount: 2, meetsTarget: true }),
+      restoreVideo: vi.fn().mockResolvedValue({ url: "file:///C:/Exports/review.mp4" }),
+      createHandoff: vi.fn().mockResolvedValue({ path: "C:/Exports/Edit-Premiere.xml", message: "Premiere XML ready." }),
+      onProductionProgress: vi.fn(() => vi.fn()),
+      produceVideo: vi.fn(),
+    };
+    const { document, app } = setup("https://grayfox.local/", desktop);
+    await app.ready;
+    document.querySelector("#workspace-user-name").value = "Marco";
+    document.querySelector("#workspace-export-path").value = "C:/Exports";
+    await app.createWorkspace();
+    app.loadVideo({ name: "interview.mp4", path: "C:/Videos/interview.mp4", url: "file:///C:/Videos/interview.mp4", duration: 60 });
+    document.querySelector("#target-minutes").value = "0.2";
+    document.querySelector("#choose-transcript").click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(document.querySelector("#dialogue-source-status").textContent).toBe("interview.srt");
+
+    await app.createFirstCut();
+    expect(document.querySelector("#review-panel").hidden).toBe(false);
+    expect(document.querySelector("#cut-count").textContent).toBe("2 cuts");
+    expect(document.querySelector("#review-summary").textContent).toContain("4 cues via embedded-subtitles");
+    expect(desktop.analyzeVideo).toHaveBeenCalledWith(expect.objectContaining({ transcriptPath: "C:/Videos/interview.srt" }));
+    expect(await app.produceCurrentVideo()).toBeNull();
+    expect(document.querySelector("#toast").textContent).toContain("Approve the first cut");
+
+    app.requestFirstCutChanges();
+    expect(document.querySelector("#revision-box").hidden).toBe(false);
+    document.querySelector("#revision-notes").value = "Keep the complete pricing answer.";
+    await app.renderRevision();
+    expect(desktop.analyzeVideo).toHaveBeenLastCalledWith(expect.objectContaining({ direction: expect.stringContaining("Revision request: Keep the complete pricing answer") }));
+
+    await app.approveFirstCut();
+    expect(document.querySelector("#review-status").textContent).toBe("Approved");
+    expect(document.querySelector("#handoff-panel").hidden).toBe(false);
+    const handoff = await app.createApprovedHandoff();
+    expect(handoff.path).toContain("Premiere.xml");
+    expect(desktop.createHandoff).toHaveBeenCalledWith(expect.objectContaining({ target: "premiere", outputPath: "C:/Exports/review.mp4" }));
+  });
+});
 describe("Story Clips and export workflows", () => {
   it("switches the selected publishing platform", () => {
     const { document } = setup();
@@ -549,8 +616,8 @@ describe("Story Clips and export workflows", () => {
     app.loadVideo({ name: "right-final.mp4", path: "C:/Videos/right-final.mp4", url: "file:///C:/Videos/right-final.mp4", size: 1000 });
     document.querySelector("#trim-start").value = "2";
     document.querySelector("#trim-end").value = "12";
+    app.state.firstCut = { approval: "approved", outputPath: "C:/Exports/approved.mp4", duration: 10, approvedAt: new Date().toISOString() };
     progressCallback({ percent: 54 });
-    expect(document.querySelector("#production-percent").textContent).toBe("54%");
 
     const result = await app.produceCurrentVideo();
     expect(result.outputPath).toBe("C:\\Exports\\Final-1.mp4");
@@ -559,7 +626,7 @@ describe("Story Clips and export workflows", () => {
       trimStart: 2,
       trimEnd: 12,
     }));
-    expect(document.querySelector("#production-title").textContent).toBe("Video ready");
+    expect(document.querySelector("#toast").textContent).toContain("saved in your export folder");
   });
 
   it("validates export before and after a video is loaded", () => {

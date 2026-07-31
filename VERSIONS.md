@@ -26,6 +26,17 @@ cut, Story Clip, or export.
 - Automatic source reconnection before real FFmpeg rendering
 - No GitHub credential embedded in the application
 
+#### Runtime update — 2026-07-31
+
+- Simplified preview workspace with the obsolete timeline controls removed
+- Required approve or request-changes decision after every first cut
+- Visible number of cuts in the rendered timeline
+- Premiere Pro XML and After Effects JSX handoffs for approved edits
+- User-confirmed YouTube, TikTok, and Instagram publishing packages
+- Direction matching against attached, sidecar, embedded, or local-Whisper dialogue transcripts
+- Honest speech-activity fallback when no transcript is available
+- Red pulsing Grayfox signal only; black header artwork removed
+
 ### 0.2.3
 This release makes requested production duration a hard requirement instead of
 a suggestion. Long-form edits now preserve chronology across distributed

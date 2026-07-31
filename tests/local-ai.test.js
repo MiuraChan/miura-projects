@@ -5,6 +5,7 @@ const {
   buildSignalCandidates,
   parseSceneTimes,
   parseSilences,
+  parseSubtitleCues,
   requestOllamaVision,
 } = localAi;
 
@@ -17,6 +18,24 @@ describe("Grayfox local AI signals", () => {
     expect(parseSceneTimes("pts_time:1.25 other pts_time:9.5")).toEqual([1.25, 9.5]);
     expect(parseSilences("silence_start: 2.0\nsilence_end: 4.5\nsilence_start: 8", 12))
       .toEqual([{ start: 2, end: 4.5 }, { start: 8, end: 12 }]);
+  });
+
+  it("parses subtitle dialogue and prioritizes the requested spoken topic", () => {
+    const cues = parseSubtitleCues(`1\n00:00:10,000 --> 00:00:13,000\nWelcome to the show.\n\n2\n00:01:20,000 --> 00:01:25,000\nOur pricing includes support and updates.`);
+    expect(cues).toEqual([
+      { start: 10, end: 13, text: "Welcome to the show." },
+      { start: 80, end: 85, text: "Our pricing includes support and updates." },
+    ]);
+    const candidates = buildSignalCandidates({
+      duration: 120,
+      targetLength: 12,
+      sceneTimes: [3, 7, 40, 82],
+      silences: [],
+      dialogueCues: cues,
+      direction: "Keep the complete pricing answer",
+    });
+    expect(candidates[0].dialogueExcerpt).toContain("pricing includes support");
+    expect(candidates[0].dialogueMatches).toContain("pricing");
   });
 
   it("ranks candidates from measured scene density, silence and an energetic tone", () => {

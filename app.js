@@ -20,6 +20,9 @@ function createGrayfoxApp(doc, win) {
     autosaveTimer: null,
     processing: null,
     analysis: null,
+    firstCut: null,
+    revisionFeedback: "",
+    transcript: null,
   };
 
   const urlParams = new win.URLSearchParams(win.location.search);
@@ -79,9 +82,24 @@ function createGrayfoxApp(doc, win) {
     productionBar: doc.querySelector("#production-bar"),
     productionCopy: doc.querySelector("#production-copy"),
     exportButton: doc.querySelector("#export-button"),
+    reviewPanel: doc.querySelector("#review-panel"),
+    reviewStatus: doc.querySelector("#review-status"),
+    reviewSummary: doc.querySelector("#review-summary"),
+    cutCount: doc.querySelector("#cut-count"),
+    approveCut: doc.querySelector("#approve-cut"),
+    requestChanges: doc.querySelector("#request-changes"),
+    revisionBox: doc.querySelector("#revision-box"),
+    revisionNotes: doc.querySelector("#revision-notes"),
+    renderRevision: doc.querySelector("#render-revision"),
+    handoffPanel: doc.querySelector("#handoff-panel"),
+    handoffTarget: doc.querySelector("#handoff-target"),
+    createHandoff: doc.querySelector("#create-handoff"),
+    handoffStatus: doc.querySelector("#handoff-status"),
     helpPopover: doc.querySelector("#help-popover"),
     helpTitle: doc.querySelector("#help-title"),
     helpCopy: doc.querySelector("#help-copy"),
+    chooseTranscript: doc.querySelector("#choose-transcript"),
+    dialogueSourceStatus: doc.querySelector("#dialogue-source-status"),
   };
 
   function showToast(message) {
@@ -469,6 +487,8 @@ function createGrayfoxApp(doc, win) {
     }
     if (elements.preview.src?.startsWith("blob:") && win.URL.revokeObjectURL) win.URL.revokeObjectURL(elements.preview.src);
     state.file = file;
+    state.transcript = null;
+    if (elements.dialogueSourceStatus) elements.dialogueSourceStatus.textContent = "Auto-detect embedded or matching .srt/.vtt";
     state.source = {
       name: file.name || "Video",
       path: file.path || null,
@@ -479,6 +499,7 @@ function createGrayfoxApp(doc, win) {
     elements.preview.src = file.url || (win.URL.createObjectURL ? win.URL.createObjectURL(file) : `grayfox-file://${encodeURIComponent(file.name)}`);
     elements.preview.style.display = "block";
     elements.empty.style.display = "none";
+    elements.replaceVideo.hidden = false;
     updateBrief();
     if (options.persist !== false) saveProject("Source ready");
     if (options.notify !== false) showToast(`${state.source.name} is ready and saved to this project.`);
@@ -514,8 +535,23 @@ function createGrayfoxApp(doc, win) {
     return true;
   }
 
+  async function chooseDialogueTranscript() {
+    if (!desktop?.chooseTranscript) {
+      showToast("Attach transcripts in the Grayfox desktop app.");
+      return null;
+    }
+    const transcript = await desktop.chooseTranscript();
+    if (!transcript?.path) return null;
+    state.transcript = transcript;
+    elements.dialogueSourceStatus.textContent = transcript.name || transcript.path;
+    elements.dialogueSourceStatus.title = transcript.path;
+    showToast(`Dialogue transcript attached: ${transcript.name || "transcript"}.`);
+    return transcript;
+  }
+
   elements.choose.addEventListener("click", chooseVideoSource);
   elements.replaceVideo.addEventListener("click", chooseVideoSource);
+  if (elements.chooseTranscript) elements.chooseTranscript.addEventListener("click", chooseDialogueTranscript);
   elements.input.addEventListener("change", (event) => loadVideo(event.target.files[0]));
   elements.preview.addEventListener("loadedmetadata", () => {
     const duration = Number(elements.preview.duration) || state.source?.duration || 0;
@@ -736,6 +772,106 @@ function createGrayfoxApp(doc, win) {
     return true;
   }
 
+  function firstCutCount(firstCut = state.firstCut) {
+    return Number(firstCut?.segmentCount) || firstCut?.editPlan?.segments?.length || (firstCut?.outputPath ? 1 : 0);
+  }
+
+  function updateReviewPanel() {
+    if (!elements.reviewPanel) return;
+    if (!state.firstCut?.outputPath) {
+      elements.reviewPanel.hidden = true;
+      return;
+    }
+    const cuts = firstCutCount();
+    const approval = state.firstCut.approval || "pending";
+    const dialogueProvider = state.firstCut.analysis?.dialogueProvider || "visual-and-audio-signals";
+    const dialogueCount = Number(state.firstCut.analysis?.dialogueCueCount) || 0;
+    elements.reviewPanel.hidden = false;
+    elements.cutCount.textContent = `${cuts} cut${cuts === 1 ? "" : "s"}`;
+    elements.reviewStatus.textContent = approval === "approved" ? "Approved" : (approval === "changes-requested" ? "Changes requested" : "Decision required");
+    elements.reviewSummary.textContent = `${formatClipTime(state.firstCut.duration)} rendered · dialogue: ${dialogueCount ? `${dialogueCount} cues via ${dialogueProvider}` : "no transcript available; visual and speech-activity signals used"}.`;
+    elements.revisionBox.hidden = approval !== "changes-requested";
+    elements.handoffPanel.hidden = approval !== "approved";
+    elements.approveCut.disabled = approval === "approved";
+  }
+
+  async function approveFirstCut() {
+    if (!state.firstCut?.outputPath) {
+      showToast("Render a first cut before approving it.");
+      return false;
+    }
+    state.firstCut.approval = "approved";
+    state.firstCut.approvedAt = new Date().toISOString();
+    state.projectStatus = "Approved";
+    updateReviewPanel();
+    await saveProject("Approved");
+    showToast("Cut approved. Adobe and social handoffs are now available.");
+    return true;
+  }
+
+  function requestFirstCutChanges() {
+    if (!state.firstCut?.outputPath) return false;
+    state.firstCut.approval = "changes-requested";
+    state.projectStatus = "Needs changes";
+    updateReviewPanel();
+    elements.revisionNotes.focus();
+    showToast("Tell Grayfox exactly what should change, then render the revision.");
+    return true;
+  }
+
+  async function renderRevision() {
+    const feedback = elements.revisionNotes.value.trim();
+    if (!feedback) {
+      showToast("Add revision notes before rendering again.");
+      return null;
+    }
+    state.revisionFeedback = feedback;
+    state.firstCut.approval = "changes-requested";
+    return createFirstCut();
+  }
+
+  async function createApprovedHandoff() {
+    if (state.firstCut?.approval !== "approved" || !state.firstCut?.outputPath) {
+      showToast("Approve the cut before creating an Adobe or social handoff.");
+      return null;
+    }
+    if (!desktop?.createHandoff) {
+      showToast("Handoffs are available in the Grayfox desktop app.");
+      return null;
+    }
+    elements.createHandoff.disabled = true;
+    elements.handoffStatus.textContent = "Preparing approved edit…";
+    try {
+      const target = elements.handoffTarget.value;
+      const result = await desktop.createHandoff({
+        target,
+        sourcePath: state.source?.path,
+        outputPath: state.firstCut.outputPath,
+        exportPath: state.workspace?.exportPath,
+        projectName: state.projectName,
+        duration: state.firstCut.duration,
+        approvedAt: state.firstCut.approvedAt,
+        segments: state.firstCut.editPlan?.segments || state.firstCut.segments || [],
+        direction: elements.direction.value.trim(),
+        tone: state.tokens,
+      });
+      elements.handoffStatus.textContent = result.message || `Created ${result.path}`;
+      showToast(result.message || "Handoff ready.");
+      return result;
+    } catch (error) {
+      elements.handoffStatus.textContent = error.message || "Could not create the handoff.";
+      showToast(elements.handoffStatus.textContent);
+      return null;
+    } finally {
+      elements.createHandoff.disabled = false;
+    }
+  }
+
+  elements.approveCut?.addEventListener("click", approveFirstCut);
+  elements.requestChanges?.addEventListener("click", requestFirstCutChanges);
+  elements.renderRevision?.addEventListener("click", renderRevision);
+  elements.createHandoff?.addEventListener("click", createApprovedHandoff);
+
   async function createFirstCut() {
     if (!state.source) {
       showToast("Add a video before creating the first cut.");
@@ -747,10 +883,12 @@ function createGrayfoxApp(doc, win) {
       return null;
     }
     startFirstCut();
+    elements.reviewPanel.hidden = true;
     try {
       const manualStart = Number(elements.trimStart.value) || 0;
       const manualEnd = Number(elements.trimEnd.value) || 0;
       const targetLength = requestedProductionSeconds();
+      const effectiveDirection = [elements.direction.value.trim(), state.revisionFeedback ? `Revision request: ${state.revisionFeedback}` : ""].filter(Boolean).join("\n");
       let selectedRange = {
         start: manualStart,
         end: Math.min(manualEnd || state.source.duration || manualStart + targetLength, manualStart + targetLength),
@@ -766,7 +904,8 @@ function createGrayfoxApp(doc, win) {
           segmentLength: state.tokens.some((token) => /fast|energetic|punchy/i.test(token)) ? 6 : 10,
           finalUse: elements.finalUse.value,
           tone: state.tokens.join(", "),
-          direction: elements.direction.value.trim(),
+          direction: effectiveDirection,
+          transcriptPath: state.transcript?.path || null,
         });
         const best = state.analysis.candidates?.[0];
         if (best) selectedRange = { start: best.start, end: best.end };
@@ -802,12 +941,14 @@ function createGrayfoxApp(doc, win) {
       if (!result.meetsTarget && !result.durationWarning) {
         result.durationWarning = `Rendered ${formatClipTime(result.duration)} of requested ${formatClipTime(effectiveTargetLength)}.`;
       }
-      state.firstCut = { ...result, analysis: state.analysis, editPlan, selectedRange };
+      state.firstCut = { ...result, analysis: state.analysis, editPlan, selectedRange, approval: "pending", revisionFeedback: state.revisionFeedback };
       if (desktop.restoreVideo) {
         const rendered = await desktop.restoreVideo(result.outputPath);
         if (rendered?.url) elements.preview.src = rendered.url;
       }
       completeFirstCut(result);
+      updateReviewPanel();
+      state.revisionFeedback = "";
       if (editPlan?.segments?.length) {
         const skippedCount = result.skippedSegments?.length || 0;
         if (!result.meetsTarget) {
@@ -947,6 +1088,7 @@ function createGrayfoxApp(doc, win) {
           finalUse: `Story clip for ${selectedPlatform()}`,
           tone: elements.shortTone.value.trim(),
           direction: "Find a self-contained hook and separately evaluate meme potential.",
+          transcriptPath: state.transcript?.path || null,
         });
         candidates = state.analysis.candidates.map((clip) => ({
           ...clip,
@@ -1009,9 +1151,9 @@ function createGrayfoxApp(doc, win) {
   });
   function updateProductionProgress(progress) {
     const percent = Math.max(0, Math.min(100, Number(progress?.percent) || 0));
-    elements.productionStatus.hidden = false;
-    elements.productionPercent.textContent = `${percent}%`;
-    elements.productionBar.style.width = `${percent}%`;
+    if (elements.productionStatus) elements.productionStatus.hidden = false;
+    if (elements.productionPercent) elements.productionPercent.textContent = `${percent}%`;
+    if (elements.productionBar) elements.productionBar.style.width = `${percent}%`;
     if (state.processing && percent < 100) advanceFirstCut(percent);
   }
 
@@ -1023,10 +1165,14 @@ function createGrayfoxApp(doc, win) {
       return null;
     }
     if (!await ensureRenderableSource("Export")) return null;
+    if (state.firstCut?.approval !== "approved") {
+      showToast("Approve the first cut before exporting or publishing it.");
+      return null;
+    }
     elements.exportButton.disabled = true;
-    elements.productionStatus.hidden = false;
-    elements.productionTitle.textContent = "Producing video";
-    elements.productionCopy.textContent = "Rendering locally with FFmpeg…";
+    if (elements.productionStatus) elements.productionStatus.hidden = false;
+    if (elements.productionTitle) elements.productionTitle.textContent = "Producing video";
+    if (elements.productionCopy) elements.productionCopy.textContent = "Rendering locally with FFmpeg…";
     updateProductionProgress({ percent: 0 });
     try {
       const exportPayload = {
@@ -1045,16 +1191,16 @@ function createGrayfoxApp(doc, win) {
           trimEnd: singleSegment?.end ?? (Number(elements.trimEnd.value) || 0),
         });
       state.lastExportPath = result.outputPath;
-      elements.productionTitle.textContent = "Video ready";
-      elements.productionCopy.textContent = result.outputPath;
+      if (elements.productionTitle) elements.productionTitle.textContent = "Video ready";
+      if (elements.productionCopy) elements.productionCopy.textContent = result.outputPath;
       updateProductionProgress({ percent: 100 });
       await saveProject("Exported");
       showToast("Video produced and saved in your export folder.");
       return result;
     } catch (error) {
-      elements.productionTitle.textContent = "Production failed";
-      elements.productionCopy.textContent = error.message || "FFmpeg could not produce the video.";
-      showToast("Production failed. Check the saved error below the timeline.");
+      if (elements.productionTitle) elements.productionTitle.textContent = "Production failed";
+      if (elements.productionCopy) elements.productionCopy.textContent = error.message || "FFmpeg could not produce the video.";
+      showToast(error.message || "Production failed.");
       return null;
     } finally {
       elements.exportButton.disabled = false;
@@ -1097,6 +1243,13 @@ function createGrayfoxApp(doc, win) {
     findClipRanges,
     renderStoryClip,
     buildClipCandidates,
+    firstCutCount,
+    updateReviewPanel,
+    approveFirstCut,
+    requestFirstCutChanges,
+    renderRevision,
+    createApprovedHandoff,
+    chooseDialogueTranscript,
   };
 }
 

@@ -12,8 +12,8 @@ const headerArtPath = path.join(projectRoot, "assets", "grayfox-header-v2.webp")
 describe("Grayfox identity motion", () => {
   it("ships the blinking signal and reduced-motion guard", () => {
     expect(stylesSource).toContain("@keyframes grayfox-signal");
-    expect(fs.existsSync(headerArtPath)).toBe(true);
-    expect(stylesSource).toContain("grayfox-header-v2.webp");
+    expect(fs.existsSync(headerArtPath)).toBe(false);
+    expect(stylesSource).not.toContain("grayfox-header-v2.webp");
     expect(stylesSource).toContain("@media (prefers-reduced-motion: reduce)");
     expect(stylesSource).toContain("animation: none !important");
   });
@@ -45,6 +45,8 @@ describe("Electron production configuration", () => {
     expect(preloadSource).toContain('ipcRenderer.invoke("workspace:choose-export-path")');
     expect(mainSource).toContain('ipcMain.handle("video:choose"');
     expect(mainSource).toContain('ipcMain.handle("video:restore"');
+    expect(mainSource).toContain('ipcMain.handle("dialogue:choose"');
+    expect(preloadSource).toContain('ipcRenderer.invoke("dialogue:choose"');
     expect(mainSource).toContain('ipcMain.handle("video:tools"');
     expect(mainSource).toContain('ipcMain.handle("video:produce"');
     expect(mainSource).toContain('ipcMain.handle("video:analyze"');
@@ -52,6 +54,8 @@ describe("Electron production configuration", () => {
     expect(preloadSource).toContain('ipcRenderer.invoke("video:tools")');
     expect(preloadSource).toContain('ipcRenderer.invoke("video:produce", options)');
     expect(preloadSource).toContain('ipcRenderer.invoke("video:analyze", options)');
+    expect(mainSource).toContain('ipcMain.handle("video:handoff"');
+    expect(preloadSource).toContain('ipcRenderer.invoke("video:handoff", options)');
   });
   it("packages the required renderer and Electron files", () => {
     expect(packageJson.main).toBe("electron/bootstrap.cjs");

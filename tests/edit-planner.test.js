@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import planner from "../electron/edit-planner.cjs";
 
-const { buildEditPlan, removeSilencesFromRange, trimSegmentsToDuration } = planner;
+const { buildEditPlan, protectDialogueBoundaries, removeSilencesFromRange, trimSegmentsToDuration } = planner;
 
 describe("Grayfox multi-segment edit planner", () => {
   it("removes measured pauses while preserving content on both sides", () => {
@@ -36,6 +36,16 @@ describe("Grayfox multi-segment edit planner", () => {
     expect(plan.outputDuration).toBeLessThanOrEqual(24);
     expect(plan.removedDuration).toBeGreaterThan(0);
     expect(plan.reordered).toBe(true);
+  });
+
+  it("does not cut through a spoken subtitle cue", () => {
+    const segments = protectDialogueBoundaries(
+      [{ start: 5, end: 10, role: "body" }],
+      [{ start: 9.5, end: 11.2, text: "complete answer" }],
+      30,
+    );
+    expect(segments[0].end).toBeCloseTo(11.28, 2);
+    expect(segments[0].dialogueProtected).toBe(true);
   });
 
   it("trims the final segment instead of exceeding the requested duration", () => {

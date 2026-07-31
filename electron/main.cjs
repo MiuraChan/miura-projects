@@ -6,6 +6,7 @@ const { pathToFileURL } = require("node:url");
 const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const { createLocalAi } = require("./local-ai.cjs");
 const { createEditRenderer } = require("./edit-renderer.cjs");
+const { createHandoff } = require("./handoff.cjs");
 
 const execFileAsync = promisify(execFile);
 const isSmokeTest = process.env.GRAYFOX_SMOKE_TEST === "1";
@@ -167,6 +168,7 @@ async function probeDuration(filePath, ffprobePath = null) {
 
 const { analyzeVideo } = createLocalAi({ resolveMediaTool, probeDuration, cleanText });
 const { produceEditedVideo } = createEditRenderer({ resolveMediaTool, probeDuration, cleanText });
+const handoffApprovedEdit = createHandoff({ shell });
 
 async function produceVideo(event, payload) {
   const sourcePath = cleanText(payload?.sourcePath, "", 2000);
@@ -227,7 +229,16 @@ function registerWorkspaceIpc() {
     const result = await dialog.showOpenDialog({ title: "Choose a source video", buttonLabel: "Use this video", properties: ["openFile"], filters: [{ name: "Videos", extensions: ["mp4", "mov", "mkv", "webm", "m4v", "avi"] }] });
     return result.canceled ? null : describeVideo(result.filePaths[0]);
   });
-  ipcMain.handle("video:restore", async (_event, filePath) => {
+  ipcMain.handle("dialogue:choose", async () => {
+    const result = await dialog.showOpenDialog({
+      title: "Attach a dialogue transcript",
+      buttonLabel: "Use this transcript",
+      properties: ["openFile"],
+      filters: [{ name: "Subtitles", extensions: ["srt", "vtt"] }],
+    });
+    if (result.canceled) return null;
+    return { name: path.basename(result.filePaths[0]), path: result.filePaths[0] };
+  });  ipcMain.handle("video:restore", async (_event, filePath) => {
     try { return await describeVideo(filePath); } catch { return null; }
   });
   ipcMain.handle("video:tools", async () => ({
@@ -237,6 +248,7 @@ function registerWorkspaceIpc() {
   ipcMain.handle("video:analyze", analyzeVideo);
   ipcMain.handle("video:produce", produceVideo);
   ipcMain.handle("video:produce-edit", produceEditedVideo);
+  ipcMain.handle("video:handoff", handoffApprovedEdit);
 }
 
 function createWindow() {
@@ -269,4 +281,4 @@ if (process.env.GRAYFOX_LIBRARY_MODE !== "1") {
   app.on("window-all-closed", () => { if (process.platform !== "darwin") app.quit(); });
 }
 
-module.exports = { analyzeVideo, cleanWorkspace, cleanWorkspaceForStorage, createWindow, describeVideo, loadWorkspaceFromDisk, probeDuration, produceEditedVideo, produceVideo, registerWorkspaceIpc, resolveMediaTool, saveWorkspaceToDisk, workspaceFilePath };
+module.exports = { analyzeVideo, cleanWorkspace, cleanWorkspaceForStorage, createWindow, describeVideo, handoffApprovedEdit, loadWorkspaceFromDisk, probeDuration, produceEditedVideo, produceVideo, registerWorkspaceIpc, resolveMediaTool, saveWorkspaceToDisk, workspaceFilePath };

@@ -9,7 +9,7 @@
   <body>
     <div class="app-shell">
       <aside class="sidebar">
-        <div class="brand brand-art" data-testid="grayfox-brand">
+        <div class="brand" data-testid="grayfox-brand">
           <span class="brand-signal" role="status" aria-label="Grayfox active"></span>
           <span>GRAYFOX</span>
         </div>
@@ -81,6 +81,7 @@
             <section class="canvas-card">
               <div class="video-stage" id="video-stage">
                 <video id="video-preview" controls playsinline></video>
+                <button class="preview-action" id="replace-video" type="button" hidden>Replace video</button>
                 <div class="empty-state" id="empty-state">
                   <div class="upload-icon">＋</div>
                   <h2>Bring in your long-form video</h2>
@@ -90,26 +91,8 @@
                 </div>
               </div>
               <input type="file" id="video-input" accept="video/*" hidden />
-
-              <div class="timeline" aria-label="Video timeline">
-                <div class="timeline-ruler">
-                  <span>00:00</span><span>04:00</span><span>08:00</span><span>12:00</span><span>16:00</span>
-                </div>
-                <div class="timeline-track">
-                  <div class="waveform"></div>
-                  <div class="playhead"></div>
-                </div>
-                <div class="edit-controls" aria-label="Production range">
-                  <button class="secondary-button compact-button" id="replace-video" type="button">Replace video</button>
-                  <label>Start (sec) <input id="trim-start" type="number" min="0" step="0.1" value="0" /></label>
-                  <label>End (sec) <input id="trim-end" type="number" min="0" step="0.1" placeholder="Full video" /></label>
-                </div>
-                <div class="production-status" id="production-status" hidden aria-live="polite">
-                  <div><strong id="production-title">Producing video</strong><span id="production-percent">0%</span></div>
-                  <div class="progress-track"><span id="production-bar"></span></div>
-                  <small id="production-copy">Rendering locally with FFmpeg…</small>
-                </div>
-              </div>
+              <input id="trim-start" type="hidden" value="0" />
+              <input id="trim-end" type="hidden" value="0" />
             </section>
 
             <aside class="ai-panel">
@@ -183,6 +166,7 @@
                   <button class="help-button" type="button" data-help-title="Editing direction" data-help="Write the result you want, not editing commands. Mention the audience, strongest moment, and what viewers should feel or do." aria-label="Explain editing direction"><span>?</span></button>
                 </div>
                 <textarea id="direction" placeholder="Example: Make this feel confident and concise. Open with the customer result, remove pauses, and finish on the product reveal."></textarea>
+                <div class="dialogue-source"><button class="secondary-button compact-button" id="choose-transcript" type="button">Attach transcript</button><span id="dialogue-source-status">Auto-detect embedded or matching .srt/.vtt</span></div>
               </div>
 
               <div class="brief-card">
@@ -209,7 +193,38 @@
                   <div class="edit-plan-summary" id="edit-plan-summary" hidden></div>
                 </div>
               </div>
-              <p class="privacy-note">Video stays on this device. Qwen3-VL evaluates sampled frames locally; FFmpeg analyzes and renders the result.</p>
+
+              <section class="review-panel" id="review-panel" hidden aria-live="polite">
+                <div class="review-heading">
+                  <div><span class="eyebrow">FIRST CUT REVIEW</span><strong id="review-status">Decision required</strong></div>
+                  <span class="cut-count" id="cut-count">0 cuts</span>
+                </div>
+                <p id="review-summary">Watch the rendered cut, then approve it or request a revision.</p>
+                <div class="review-actions">
+                  <button class="primary-button" id="approve-cut" type="button">Approve cut</button>
+                  <button class="secondary-button" id="request-changes" type="button">Needs changes</button>
+                </div>
+                <div class="revision-box" id="revision-box" hidden>
+                  <label for="revision-notes">What should Grayfox change?</label>
+                  <textarea id="revision-notes" placeholder="Example: Keep the complete answer about pricing, remove the repeated introduction, and end after the call to action."></textarea>
+                  <button class="secondary-button" id="render-revision" type="button">Render revision</button>
+                </div>
+                <div class="handoff-panel" id="handoff-panel" hidden>
+                  <label for="handoff-target">Continue with approved cut</label>
+                  <div class="handoff-row">
+                    <select id="handoff-target">
+                      <option value="premiere">Adobe Premiere Pro XML</option>
+                      <option value="after-effects">After Effects script</option>
+                      <option value="youtube">YouTube publishing package</option>
+                      <option value="tiktok">TikTok publishing package</option>
+                      <option value="instagram">Instagram publishing package</option>
+                    </select>
+                    <button class="primary-button" id="create-handoff" type="button">Create handoff</button>
+                  </div>
+                  <small id="handoff-status">Grayfox prepares the approved edit; you confirm the final import or post.</small>
+                </div>
+              </section>
+              <p class="privacy-note">Video stays on this device. Dialogue analysis uses embedded subtitles or an available local speech recognizer; Grayfox reports the source it used.</p>
             </aside>
           </div>
         </section>

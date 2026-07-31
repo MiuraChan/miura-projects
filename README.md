@@ -6,6 +6,7 @@ Local-first Windows video editor for direction-aware first cuts, ranked Story Cl
 
 - Grayfox persists the user, export folder, profile, and project options locally. Source-video paths are intentionally reconnected on demand.
 - FFmpeg and FFprobe perform scene/audio analysis and render H.264/AAC MP4 files.
+- Dialogue-aware direction uses an attached, matching sidecar, or embedded `.srt`/`.vtt` transcript. A configured local Whisper executable is also supported. Without real words, Grayfox explicitly reports its speech-activity-only fallback.
 - Ollama with `qwen3-vl:2b-instruct` evaluates sampled video frames locally. No OpenAI key is required.
 - If Ollama is unavailable, Grayfox labels and uses its measured scene/silence fallback instead of inventing an AI result.
 
@@ -38,9 +39,12 @@ connected later for end-user distribution.
 
 1. Import a local video.
 2. Choose final use, tone tokens, and editing direction.
-3. Grayfox detects scene changes and silence, samples candidate frames, and sends only those frames plus the brief to local Qwen3-VL.
-4. Grayfox builds a hook/body/close timeline from multiple ranked ranges, removes measured pauses, and can reorder sections to follow the direction.
-5. FFmpeg trims and concatenates the timeline into a new H.264/AAC MP4, which is shown for review with the segment count and removed duration.
+3. Optionally attach an `.srt` or `.vtt` transcript. Grayfox also checks matching sidecars and embedded subtitles before falling back to locally configured Whisper or speech activity.
+4. Grayfox detects scene changes and silence, samples candidate frames, and sends only those frames plus the brief to local Qwen3-VL.
+5. Grayfox builds a hook/body/close timeline from multiple ranked ranges, protects dialogue boundaries, and prioritizes spoken terms that match the editing direction.
+6. FFmpeg trims and concatenates the timeline into a new H.264/AAC MP4. The simplified review view shows the rendered preview and number of cuts.
+7. Approve the cut or request a revision with concrete notes. Export and handoff remain locked until approval.
+8. An approved cut can create a Premiere XML, an After Effects JSX composition, or a YouTube/TikTok/Instagram publishing package. Social publishing always requires the user to confirm the post in the platform UI.
 
 ### Story Clips
 

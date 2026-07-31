@@ -177,9 +177,22 @@ function buildLongFormSegments({ candidates, silences, sourceDuration, target, m
   return assignRoles(segments);
 }
 
+function protectDialogueBoundaries(segments, dialogueCues, sourceDuration) {
+  return segments.map((segment) => {
+    let start = segment.start;
+    let end = segment.end;
+    for (const cue of dialogueCues) {
+      if (cue.start < start && cue.end > start) start = Math.max(0, cue.start - 0.08);
+      if (cue.start < end && cue.end > end) end = Math.min(sourceDuration, cue.end + 0.08);
+    }
+    return { ...segment, start: Number(start.toFixed(3)), end: Number(end.toFixed(3)), dialogueProtected: start !== segment.start || end !== segment.end };
+  });
+}
+
 function buildEditPlan({
   candidates,
   silences = [],
+  dialogueCues = [],
   sourceDuration,
   desiredDuration,
   direction = "",
@@ -216,7 +229,11 @@ function buildEditPlan({
   const strongest = selectedWindows[0];
   const remaining = selectedWindows.slice(1).sort((a, b) => a.start - b.start);
   const wantsEnding = /(finish|ending|end on|close with|reveal|finale|conclud)/i.test(direction);
-  let orderedWindows = [strongest, ...remaining];
+  const preserveDialogue = /(dialogue|conversation|interview|answer|speech|dialogo|conversazione|intervista|risposta|parla)/i.test(direction);
+  const explicitlyChronological = /(chronological|in order|same order|cronologic|stesso ordine)/i.test(direction);
+  let orderedWindows = preserveDialogue || explicitlyChronological
+    ? [...selectedWindows].sort((a, b) => a.start - b.start)
+    : [strongest, ...remaining];
   if (wantsEnding && remaining.length) {
     const ending = remaining.reduce((latest, item) => item.end > latest.end ? item : latest, remaining[0]);
     orderedWindows = [strongest, ...remaining.filter((item) => item !== ending), ending];
@@ -229,7 +246,8 @@ function buildEditPlan({
       role: windowIndex === 0 ? "hook" : (windowIndex === orderedWindows.length - 1 ? "close" : "body"),
     })))
     .filter((segment) => segment.end - segment.start >= 0.5);
-  const segments = trimSegmentsToDuration(contentSegments, target).slice(0, shortSegmentLimit);
+  let segments = trimSegmentsToDuration(contentSegments, target).slice(0, shortSegmentLimit);
+  if (preserveDialogue && dialogueCues.length) segments = protectDialogueBoundaries(segments, dialogueCues, sourceDuration);
   const outputDuration = segments.reduce((total, segment) => total + (segment.end - segment.start), 0);
   const coveredSpan = segments.length ? Math.max(...segments.map((segment) => segment.end)) - Math.min(...segments.map((segment) => segment.start)) : 0;
   return {
@@ -249,6 +267,7 @@ module.exports = {
   buildLongFormSegments,
   coalesceSegmentsToLimit,
   complementRanges,
+  protectDialogueBoundaries,
   rangesOverlap,
   removeSilencesFromRange,
   sliceSegmentsByContentTime,

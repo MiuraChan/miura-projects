@@ -44,7 +44,8 @@ describe("Grayfox initial state and routing", () => {
     const { document } = setup();
     expect(document.querySelector('[data-testid="grayfox-brand"] img')).toBeNull();
     expect(document.querySelector('[data-testid="grayfox-brand"]').classList.contains("brand-art")).toBe(false);
-    expect(document.querySelector('.ai-glyph img')).toBeNull();
+    expect(document.querySelector(".ai-glyph")).toBeNull();
+    expect(document.querySelector(".brief-signal.brand-signal")).not.toBeNull();
     expect(document.querySelector('.modal-grayfox-id')).toBeNull();
     expect(document.querySelector('.brand-signal[role="status"]').getAttribute("aria-label"))
       .toBe("Grayfox active");
@@ -134,6 +135,81 @@ describe("Video and AI brief workflow", () => {
     expect(app.loadVideo()).toBe(false);
     expect(app.loadVideo(new window.File(["x"], "notes.txt", { type: "text/plain" }))).toBe(false);
     expect(document.querySelector("#toast").textContent).toBe("Please choose a valid video file.");
+  });
+
+  it("makes the whole cleaned import surface choose a desktop video", async () => {
+    const desktop = {
+      chooseVideo: vi.fn().mockResolvedValue({ name: "direct.mp4", path: "C:/Videos/direct.mp4", url: "file:///C:/Videos/direct.mp4", duration: 42 }),
+      onProductionProgress: vi.fn(() => vi.fn()),
+    };
+    const { document, app } = setup("https://grayfox.local/", desktop);
+
+    document.querySelector("#empty-state").click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(desktop.chooseVideo).toHaveBeenCalledOnce();
+    expect(app.state.source.name).toBe("direct.mp4");
+    expect(document.querySelector("#empty-state").style.display).toBe("none");
+    expect(document.querySelector(".upload-signal")).not.toBeNull();
+  });
+
+  it("uses a gray pulse for an empty recent workflow and a real frame after loading", async () => {
+    const { document, window, app } = setup("file:///C:/Grayfox/index.html", null, "", (testWindow) => {
+      testWindow.HTMLCanvasElement.prototype.getContext = vi.fn(() => ({ drawImage: vi.fn() }));
+      testWindow.HTMLCanvasElement.prototype.toDataURL = vi.fn(() => "data:image/jpeg;base64,grayfoxframe");
+    });
+    await app.ready;
+    document.querySelector("#workspace-user-name").value = "Marco";
+    document.querySelector("#workspace-export-path").value = "C:/Exports";
+    await app.createWorkspace();
+    await app.saveProject("Draft");
+    expect(document.querySelector(".recent-placeholder-signal")).not.toBeNull();
+
+    const preview = document.querySelector("#video-preview");
+    Object.defineProperty(preview, "videoWidth", { configurable: true, value: 1920 });
+    Object.defineProperty(preview, "videoHeight", { configurable: true, value: 1080 });
+    app.loadVideo(videoFile(window, "workflow.mp4"));
+    preview.dispatchEvent(new window.Event("loadeddata"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(app.state.projectThumbnail).toBe("data:image/jpeg;base64,grayfoxframe");
+    expect(document.querySelector(".recent-thumb img").src).toBe("data:image/jpeg;base64,grayfoxframe");
+    expect(document.querySelector(".recent-placeholder-signal")).toBeNull();
+  });
+
+  it("rejects unavailable, failed, and oversized workflow frame captures", () => {
+    const { document, app } = setup();
+    const preview = document.querySelector("#video-preview");
+    expect(app.captureProjectThumbnail()).toBeNull();
+
+    Object.defineProperty(preview, "videoWidth", { configurable: true, value: 1920 });
+    Object.defineProperty(preview, "videoHeight", { configurable: true, value: 1080 });
+    const originalCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation((tagName, options) => {
+      const element = originalCreateElement(tagName, options);
+      if (tagName === "canvas") element.getContext = vi.fn(() => null);
+      return element;
+    });
+    expect(app.captureProjectThumbnail()).toBeNull();
+
+    document.createElement.mockImplementation((tagName, options) => {
+      const element = originalCreateElement(tagName, options);
+      if (tagName === "canvas") {
+        element.getContext = vi.fn(() => ({ drawImage: () => { throw new Error("frame blocked"); } }));
+      }
+      return element;
+    });
+    expect(app.captureProjectThumbnail()).toBeNull();
+
+    document.createElement.mockImplementation((tagName, options) => {
+      const element = originalCreateElement(tagName, options);
+      if (tagName === "canvas") {
+        element.getContext = vi.fn(() => ({ drawImage: vi.fn() }));
+        element.toDataURL = vi.fn(() => `data:image/jpeg;base64,${"x".repeat(300001)}`);
+      }
+      return element;
+    });
+    expect(app.captureProjectThumbnail()).toBeNull();
   });
 
   it("loads a video and updates preview and brief", () => {

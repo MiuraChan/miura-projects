@@ -56,6 +56,11 @@ function cleanProject(project, exportPath) {
       end: Math.max(0, Number(trim.end) || 0),
     },
     lastExportPath: cleanText(project?.lastExportPath, "", 2000) || null,
+    thumbnail: typeof project?.thumbnail === "string"
+      && /^data:image\/jpeg;base64,/i.test(project.thumbnail)
+      && project.thumbnail.length <= 300000
+      ? project.thumbnail
+      : null,
     updatedAt: cleanText(project?.updatedAt, new Date().toISOString(), 80),
   };
 }

@@ -82,13 +82,12 @@
               <div class="video-stage" id="video-stage">
                 <video id="video-preview" controls playsinline></video>
                 <button class="preview-action" id="replace-video" type="button" hidden>Replace video</button>
-                <div class="empty-state" id="empty-state">
-                  <div class="upload-icon">＋</div>
+                <button class="empty-state" id="empty-state" type="button">
+                  <span class="upload-signal" aria-hidden="true"></span>
                   <h2>Bring in your long-form video</h2>
-                  <p>Drop a file here or choose one from your PC.</p>
-                  <button class="primary-button" id="choose-video">Choose video</button>
+                  <p>Click anywhere here or drop a file from your PC.</p>
                   <small>MP4, MOV, WebM · processed on this device</small>
-                </div>
+                </button>
               </div>
               <input type="file" id="video-input" accept="video/*" hidden />
               <input id="trim-start" type="hidden" value="0" />
@@ -97,7 +96,7 @@
 
             <aside class="ai-panel">
               <div class="panel-heading">
-                <div class="ai-glyph" aria-label="Grayfox assistant active"><span class="brand-signal" role="status" aria-label="Grayfox active"></span><span class="assistant-pulse" aria-hidden="true"></span></div>
+                <span class="brand-signal brief-signal" role="status" aria-label="Grayfox assistant active"></span>
                 <div>
                   <h2>Edit brief</h2>
                   <p>Set the range and describe the result you want.</p>

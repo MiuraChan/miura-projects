@@ -23,6 +23,8 @@ function createGrayfoxApp(doc, win) {
     firstCut: null,
     revisionFeedback: "",
     transcript: null,
+    projectThumbnail: null,
+    thumbnailCaptureHandler: null,
   };
 
   const urlParams = new win.URLSearchParams(win.location.search);
@@ -30,7 +32,7 @@ function createGrayfoxApp(doc, win) {
 
   const elements = {
     input: doc.querySelector("#video-input"),
-    choose: doc.querySelector("#choose-video"),
+    choose: doc.querySelector("#empty-state"),
     stage: doc.querySelector("#video-stage"),
     preview: doc.querySelector("#video-preview"),
     empty: doc.querySelector("#empty-state"),
@@ -178,7 +180,18 @@ function createGrayfoxApp(doc, win) {
         button.className = "recent-item";
         button.type = "button";
         const thumb = doc.createElement("span");
-        thumb.className = `recent-thumb ${index % 2 ? "gradient-two" : "gradient-one"}`;
+        thumb.className = "recent-thumb";
+        if (/^data:image\/jpeg;base64,/i.test(project.thumbnail || "")) {
+          const image = doc.createElement("img");
+          image.src = project.thumbnail;
+          image.alt = "";
+          thumb.appendChild(image);
+        } else {
+          const signal = doc.createElement("span");
+          signal.className = "recent-placeholder-signal";
+          signal.setAttribute("aria-hidden", "true");
+          thumb.appendChild(signal);
+        }
         const copy = doc.createElement("span");
         const title = doc.createElement("strong");
         title.textContent = project.name;
@@ -425,6 +438,7 @@ function createGrayfoxApp(doc, win) {
         end: Math.max(0, Number(elements.trimEnd.value) || 0),
       },
       lastExportPath: state.lastExportPath,
+      thumbnail: state.projectThumbnail,
       updatedAt: new Date().toISOString(),
     };
     state.workspace.currentProjectId = project.id;
@@ -446,6 +460,7 @@ function createGrayfoxApp(doc, win) {
     state.projectName = project.name || "Untitled edit";
     state.projectStatus = project.status || "Draft";
     state.lastExportPath = project.lastExportPath || null;
+    state.projectThumbnail = /^data:image\/jpeg;base64,/i.test(project.thumbnail || "") ? project.thumbnail : null;
     state.tokens = Array.isArray(project.editor?.tokens) ? [...project.editor.tokens] : [];
     elements.projectName.value = state.projectName;
     elements.finalUse.value = project.editor?.finalUse || "Website / landing page";
@@ -488,6 +503,7 @@ function createGrayfoxApp(doc, win) {
     if (elements.preview.src?.startsWith("blob:") && win.URL.revokeObjectURL) win.URL.revokeObjectURL(elements.preview.src);
     state.file = file;
     state.transcript = null;
+    state.projectThumbnail = null;
     if (elements.dialogueSourceStatus) elements.dialogueSourceStatus.textContent = "Auto-detect embedded or matching .srt/.vtt";
     state.source = {
       name: file.name || "Video",
@@ -496,6 +512,15 @@ function createGrayfoxApp(doc, win) {
       lastModified: Number(file.lastModified) || 0,
       duration: Number(file.duration) || 0,
     };
+    if (state.thumbnailCaptureHandler) elements.preview.removeEventListener("loadeddata", state.thumbnailCaptureHandler);
+    state.thumbnailCaptureHandler = async () => {
+      state.thumbnailCaptureHandler = null;
+      const thumbnail = captureProjectThumbnail();
+      if (!thumbnail) return;
+      state.projectThumbnail = thumbnail;
+      await saveProject("Source ready");
+    };
+    elements.preview.addEventListener("loadeddata", state.thumbnailCaptureHandler, { once: true });
     elements.preview.src = file.url || (win.URL.createObjectURL ? win.URL.createObjectURL(file) : `grayfox-file://${encodeURIComponent(file.name)}`);
     elements.preview.style.display = "block";
     elements.empty.style.display = "none";
@@ -504,6 +529,27 @@ function createGrayfoxApp(doc, win) {
     if (options.persist !== false) saveProject("Source ready");
     if (options.notify !== false) showToast(`${state.source.name} is ready and saved to this project.`);
     return true;
+  }
+
+  function captureProjectThumbnail() {
+    const sourceWidth = Number(elements.preview.videoWidth) || 0;
+    const sourceHeight = Number(elements.preview.videoHeight) || 0;
+    if (!sourceWidth || !sourceHeight) return null;
+    try {
+      const canvas = doc.createElement("canvas");
+      canvas.width = 160;
+      canvas.height = 90;
+      const context = canvas.getContext("2d");
+      if (!context) return null;
+      const scale = Math.max(canvas.width / sourceWidth, canvas.height / sourceHeight);
+      const cropWidth = canvas.width / scale;
+      const cropHeight = canvas.height / scale;
+      context.drawImage(elements.preview, (sourceWidth - cropWidth) / 2, (sourceHeight - cropHeight) / 2, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.68);
+      return dataUrl.length <= 300000 ? dataUrl : null;
+    } catch {
+      return null;
+    }
   }
 
   async function chooseVideoSource() {
@@ -1250,6 +1296,7 @@ function createGrayfoxApp(doc, win) {
     renderRevision,
     createApprovedHandoff,
     chooseDialogueTranscript,
+    captureProjectThumbnail,
   };
 }
 

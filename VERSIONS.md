@@ -36,6 +36,8 @@ cut, Story Clip, or export.
 - Direction matching against attached, sidecar, embedded, or local-Whisper dialogue transcripts
 - Honest speech-activity fallback when no transcript is available
 - Red pulsing Grayfox signal only; black header artwork removed
+- Recent workflow thumbnails use a real locally captured video frame, with a gray pulse before import
+- Clean full-surface video picker supports direct click and drag-and-drop
 
 ### 0.2.3
 This release makes requested production duration a hard requirement instead of

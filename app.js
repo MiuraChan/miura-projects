@@ -25,6 +25,7 @@ function createGrayfoxApp(doc, win) {
     transcript: null,
     projectThumbnail: null,
     thumbnailCaptureHandler: null,
+    previewRepresentsSource: false,
   };
 
   const urlParams = new win.URLSearchParams(win.location.search);
@@ -521,6 +522,7 @@ function createGrayfoxApp(doc, win) {
       await saveProject("Source ready");
     };
     elements.preview.addEventListener("loadeddata", state.thumbnailCaptureHandler, { once: true });
+    state.previewRepresentsSource = true;
     elements.preview.src = file.url || (win.URL.createObjectURL ? win.URL.createObjectURL(file) : `grayfox-file://${encodeURIComponent(file.name)}`);
     elements.preview.style.display = "block";
     elements.empty.style.display = "none";
@@ -601,7 +603,7 @@ function createGrayfoxApp(doc, win) {
   elements.input.addEventListener("change", (event) => loadVideo(event.target.files[0]));
   elements.preview.addEventListener("loadedmetadata", () => {
     const duration = Number(elements.preview.duration) || state.source?.duration || 0;
-    if (state.source) state.source.duration = duration;
+    if (state.source && state.previewRepresentsSource) state.source.duration = duration;
     if (duration) {
       elements.trimStart.max = String(duration);
       elements.trimEnd.max = String(duration);
@@ -835,7 +837,11 @@ function createGrayfoxApp(doc, win) {
     elements.reviewPanel.hidden = false;
     elements.cutCount.textContent = `${cuts} cut${cuts === 1 ? "" : "s"}`;
     elements.reviewStatus.textContent = approval === "approved" ? "Approved" : (approval === "changes-requested" ? "Changes requested" : "Decision required");
-    elements.reviewSummary.textContent = `${formatClipTime(state.firstCut.duration)} rendered · dialogue: ${dialogueCount ? `${dialogueCount} cues via ${dialogueProvider}` : "no transcript available; visual and speech-activity signals used"}.`;
+    const excludedRanges = state.firstCut.analysis?.excludedRanges || [];
+    const excludedSeconds = excludedRanges.reduce((total, range) => total + Math.max(0, range.end - range.start), 0);
+    const compliance = excludedRanges.length ? ` · ${excludedRanges.length} required exclusion${excludedRanges.length === 1 ? "" : "s"} enforced (${formatClipTime(excludedSeconds)})` : "";
+    const memes = Number(state.firstCut.analysis?.memeBeatCount) ? ` · ${state.firstCut.analysis.memeBeatCount} visual meme beat${state.firstCut.analysis.memeBeatCount === 1 ? "" : "s"}` : "";
+    elements.reviewSummary.textContent = `${formatClipTime(state.firstCut.duration)} rendered · dialogue: ${dialogueCount ? `${dialogueCount} cues via ${dialogueProvider}` : "no transcript available; visual and speech-activity signals used"}${compliance}${memes}.`;
     elements.revisionBox.hidden = approval !== "changes-requested";
     elements.handoffPanel.hidden = approval !== "approved";
     elements.approveCut.disabled = approval === "approved";
@@ -953,6 +959,15 @@ function createGrayfoxApp(doc, win) {
           direction: effectiveDirection,
           transcriptPath: state.transcript?.path || null,
         });
+        if (state.analysis.directionRules?.mustRemove?.length && Number(state.analysis.directionAuditCoverage) < 0.8) {
+          throw new Error("Grayfox could not verify enough of the timeline to enforce your removal instructions. No misleading cut was rendered. Check that the local vision engine is running, then try again.");
+        }
+        const excludedSeconds = (state.analysis.excludedRanges || []).reduce((total, range) => total + Math.max(0, range.end - range.start), 0);
+        if (state.analysis.directionAuditCount) {
+          elements.processingTitle.textContent = "Direction audit complete";
+          elements.processingEta.textContent = `${state.analysis.directionAuditCount} timeline samples checked`;
+          elements.processingCuriosity.textContent = `${state.analysis.excludedRanges.length} mandatory exclusion${state.analysis.excludedRanges.length === 1 ? "" : "s"} (${formatClipTime(excludedSeconds)}) · ${state.analysis.memeBeatCount || 0} visual meme beat${state.analysis.memeBeatCount === 1 ? "" : "s"} planned.`;
+        }
         const best = state.analysis.candidates?.[0];
         if (best) selectedRange = { start: best.start, end: best.end };
       }
@@ -990,7 +1005,10 @@ function createGrayfoxApp(doc, win) {
       state.firstCut = { ...result, analysis: state.analysis, editPlan, selectedRange, approval: "pending", revisionFeedback: state.revisionFeedback };
       if (desktop.restoreVideo) {
         const rendered = await desktop.restoreVideo(result.outputPath);
-        if (rendered?.url) elements.preview.src = rendered.url;
+        if (rendered?.url) {
+          state.previewRepresentsSource = false;
+          elements.preview.src = rendered.url;
+        }
       }
       completeFirstCut(result);
       updateReviewPanel();

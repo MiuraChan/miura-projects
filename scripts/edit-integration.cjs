@@ -38,7 +38,7 @@ app.whenReady().then(async () => {
       exportPath,
       projectName: "verified-multicut",
       segments: [
-        { start: 0, end: 2, role: "hook" },
+        { start: 0, end: 2, role: "hook", effect: "meme-punch" },
         { start: 4, end: 6, role: "body" },
         { start: 9, end: 11, role: "close" },
       ],

@@ -910,3 +910,51 @@ describe("Contextual Grayfox guidance", () => {
     expect(document.querySelector("#toast").textContent).toContain("Voice guidance is not available");
   });
 });
+
+describe("Source preview duration integrity", () => {
+  it("does not replace the source duration with the rendered first cut duration", () => {
+    const { document, window, app } = setup();
+    const preview = document.querySelector("#video-preview");
+    app.loadVideo({ name: "Sequence_02.mp4", path: "D:/VODS/Sequence_02.mp4", url: "file:///D:/VODS/Sequence_02.mp4", duration: 4977.64 });
+    Object.defineProperty(preview, "duration", { configurable: true, value: 4977.64 });
+    preview.dispatchEvent(new window.Event("loadedmetadata"));
+    expect(app.state.source.duration).toBeCloseTo(4977.64, 2);
+
+    app.state.previewRepresentsSource = false;
+    Object.defineProperty(preview, "duration", { configurable: true, value: 1800 });
+    preview.dispatchEvent(new window.Event("loadedmetadata"));
+    expect(app.state.source.duration).toBeCloseTo(4977.64, 2);
+  });
+});
+describe("Mandatory direction audit gate", () => {
+  it("refuses to render when removal instructions were not visually verified", async () => {
+    const desktop = {
+      chooseExportPath: vi.fn(),
+      analyzeVideo: vi.fn().mockResolvedValue({
+        directionRules: { mustRemove: ["remove the old episode"], mustKeep: [] },
+        directionAuditCoverage: 0,
+        directionAuditCount: 0,
+        excludedRanges: [],
+        candidates: [{ start: 0, end: 30, score: 50 }],
+      }),
+      produceVideo: vi.fn(),
+      produceEditedVideo: vi.fn(),
+      onProductionProgress: vi.fn(() => vi.fn()),
+    };
+    const { document, app } = setup("https://grayfox.local/", desktop);
+    await app.ready;
+    document.querySelector("#workspace-user-name").value = "Marco";
+    document.querySelector("#workspace-export-path").value = "C:/Exports";
+    await app.createWorkspace();
+    app.loadVideo({ name: "source.mp4", path: "C:/Videos/source.mp4", url: "file:///C:/Videos/source.mp4", duration: 5000 });
+    document.querySelector("#direction").value = "Remove the old episode";
+
+    const result = await app.createFirstCut();
+
+    expect(result).toBeNull();
+    expect(desktop.produceVideo).not.toHaveBeenCalled();
+    expect(desktop.produceEditedVideo).not.toHaveBeenCalled();
+    expect(document.querySelector("#processing-title").textContent).toBe("First cut failed");
+    expect(document.querySelector("#processing-curiosity").textContent).toContain("could not verify enough of the timeline");
+  });
+});

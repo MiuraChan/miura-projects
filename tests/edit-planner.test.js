@@ -89,4 +89,26 @@ describe("Grayfox multi-segment edit planner", () => {
     expect(plan.segments.at(-1).role).toBe("close");
     expect(plan.segments.every((segment, index) => index === 0 || segment.start >= plan.segments[index - 1].end)).toBe(true);
   });
-});
+
+  it("never crosses hard exclusion ranges while filling a long target", () => {
+    const plan = buildEditPlan({
+      candidates: [
+        { start: 300, end: 360, score: 80 },
+        { start: 1800, end: 1860, score: 96 },
+        { start: 3600, end: 3660, score: 88 },
+      ],
+      sourceDuration: 4977.64,
+      desiredDuration: 1800,
+      direction: "Remove the old episode and keep me talking",
+      excludedRanges: [
+        { start: 540, end: 1680, reason: "old episode" },
+        { start: 2100, end: 2400, reason: "gameplay" },
+      ],
+    });
+
+    expect(plan.hardExclusionsApplied).toBe(true);
+    expect(plan.outputDuration).toBeCloseTo(1800, 2);
+    expect(plan.segments.every((segment) =>
+      plan.excludedRanges.every((range) => segment.end <= range.start || segment.start >= range.end)
+    )).toBe(true);
+  });});

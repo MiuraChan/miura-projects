@@ -33,4 +33,13 @@ describe("Grayfox resilient edit renderer", () => {
   it("writes concat entries with portable forward slashes", () => {
     expect(concatFileEntry("C:\\Grayfox\\segment-001.mp4")).toBe("file 'C:/Grayfox/segment-001.mp4'");
   });
-});
+
+  it("preserves only approved meme punch effects", () => {
+    expect(cleanSegments([
+      { start: 1, end: 4, role: "body", effect: "meme-punch" },
+      { start: 5, end: 8, role: "body", effect: "unknown" },
+    ], 10)).toEqual([
+      { start: 1, end: 4, role: "body", effect: "meme-punch" },
+      { start: 5, end: 8, role: "body" },
+    ]);
+  });});

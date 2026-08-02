@@ -70,6 +70,122 @@ function directionKeywords(direction) {
     .slice(0, 16);
 }
 
+function extractDirectionRules(direction) {
+  const clauses = String(direction || "")
+    .split(/[.!?;\n]+/)
+    .map((clause) => clause.trim())
+    .filter(Boolean);
+  const removePattern = /\b(remove|cut|skip|exclude|delete|drop|omit|togli|taglia|rimuovi|elimina|scarta|salta)\b|\b(not important|unimportant|non (?:e|è) importante)\b/i;
+  const keepPattern = /\b(keep|focus|prioriti[sz]e|important|center on|preserve|mantieni|conserva|importante|concentrati|dai priorita|dai priorità)\b/i;
+  return {
+    mustRemove: clauses.filter((clause) => removePattern.test(clause)).slice(0, 12),
+    mustKeep: clauses.filter((clause) => keepPattern.test(clause) && !removePattern.test(clause)).slice(0, 12),
+  };
+}
+
+function normalizeVisionScore(value, fallback = 0) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return clamp(Math.round(numeric > 0 && numeric <= 1 ? numeric * 100 : numeric), 0, 100);
+}
+
+function hasPositiveVisibleMatch(text, pattern) {
+  const expression = new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`);
+  for (const match of text.matchAll(expression)) {
+    const prefix = text.slice(Math.max(0, match.index - 80), match.index);
+    if (/(?:\bno\b|\bnot\b|without|does not|do not|no evidence of|no indication of|does not contain)[^.!?]{0,70}$/i.test(prefix)) continue;
+    return true;
+  }
+  return false;
+}
+
+function enforceVisibleDirectionDecision(decision, confidence, reason, rules) {
+  const visible = String(reason || "").toLowerCase();
+  const removalBrief = (rules?.mustRemove || []).join(" ").toLowerCase();
+  const removesGameplay = /game|gameplay|gioco/.test(removalBrief);
+  const removesRewatch = /rewatch|re-watch|old episode|old video|riguard|vecchi[oa]? episodi|episodio vecchio/.test(removalBrief);
+  const directlyTalking = /direct-to-camera|speaking directly to (?:the )?camera/.test(visible);
+  const explicitlyNoGameplay = /(?:no evidence|no indication|does not contain|without)[^.!?]{0,70}(?:gameplay|video game)/.test(visible);
+  const explicitlyNoRewatch = /(?:no evidence|no indication|does not contain|without)[^.!?]{0,70}(?:replay|rewatch|old episode)/.test(visible);
+  const explicitlyClear = (!removesGameplay || explicitlyNoGameplay) && (!removesRewatch || explicitlyNoRewatch);
+  if (directlyTalking && explicitlyClear) return { decision: "keep", confidence: Math.max(82, confidence), enforcedBy: "visible-direct-camera-rule" };
+  if (removesGameplay && hasPositiveVisibleMatch(visible, /gameplay|video game|in-game|combat|mission/i)) {
+    return { decision: "remove", confidence: Math.max(85, confidence), enforcedBy: "visible-gameplay-rule" };
+  }
+  if (removesRewatch && hasPositiveVisibleMatch(visible, /old episode|replay|previously recorded|recovery episode|episode 0|watching (?:a |the )?(?:youtube )?video|youtube video player/i)) {
+    return { decision: "remove", confidence: Math.max(82, confidence), enforcedBy: "visible-rewatch-rule" };
+  }
+  return { decision, confidence, enforcedBy: null };
+}
+function buildTimelineWindows(duration, interval = 60) {
+  const step = Math.max(20, Number(interval) || 60);
+  const windows = [];
+  for (let start = 0; start < duration; start += step) {
+    const end = Math.min(duration, start + step);
+    windows.push({ start, end, sampleAt: start + ((end - start) / 2) });
+  }
+  return windows.slice(0, 120);
+}
+
+function mergeExcludedTimelineRanges(reviews, minimumConfidence = 60) {
+  const ranges = reviews
+    .filter((review) => review.decision === "remove" && Number(review.confidence) >= minimumConfidence)
+    .map((review) => ({ start: Number(review.start), end: Number(review.end), reason: review.reason || "direction-match", enforcedBy: review.enforcedBy || null }))
+    .filter((range) => Number.isFinite(range.start) && Number.isFinite(range.end) && range.end > range.start)
+    .sort((a, b) => a.start - b.start);
+  const merged = [];
+  for (const range of ranges) {
+    const previous = merged.at(-1);
+    const sameRuleGap = previous?.enforcedBy && previous.enforcedBy === range.enforcedBy && range.start <= previous.end + 300;
+    if (previous && (range.start <= previous.end + 5 || sameRuleGap)) {
+      previous.end = Math.max(previous.end, range.end);
+      previous.reason = `${previous.reason}; ${range.reason}`.slice(0, 500);
+    } else merged.push({ ...range });
+  }
+  return merged;
+}
+
+async function requestOllamaTimelineReview(windows, images, rules, brief) {
+  const model = process.env.GRAYFOX_OLLAMA_MODEL || "qwen3-vl:2b-instruct";
+  const response = await fetch("http://127.0.0.1:11434/api/chat", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      model,
+      stream: false,
+      format: "json",
+      options: { temperature: 0.05, num_ctx: 8192, num_predict: 1400 },
+      messages: [{
+        role: "user",
+        content: `You are the compliance editor for a long-form video. Each image is a chronological timeline sample. The user instructions are binding.\nMUST REMOVE: ${rules.mustRemove.join(" | ") || "none"}\nMUST KEEP/PRIORITIZE: ${rules.mustKeep.join(" | ") || "none"}\nFULL BRIEF: ${brief || "none"}\nIndexes: ${windows.map((window, index) => `${index}=${Math.round(window.start)}-${Math.round(window.end)}s`).join(", ")}.\nClassify what is visibly happening. A creator watching a nested Twitch/video player, an old episode, replay or previously recorded program is different from the creator speaking directly to camera. Gameplay is different from direct-to-camera storytelling. Mark remove only when the visible evidence matches a MUST REMOVE rule. Mark keep when it matches a MUST KEEP rule. Otherwise neutral. Never infer spoken words.\nReturn exactly one review for every supplied index, with no omissions. Return JSON only: {"reviews":[{"index":0,"decision":"keep|remove|neutral","confidence":0,"semanticScore":0,"memeScore":0,"reason":"max eight grounded words"}]}.`,
+        images,
+      }],
+    }),
+    signal: AbortSignal.timeout(180000),
+  });
+  if (!response.ok) throw new Error(`Timeline vision returned HTTP ${response.status}: ${(await response.text()).slice(0, 500)}`);
+  const payload = await response.json();
+  const parsed = JSON.parse(payload?.message?.content || "{}");
+  if (!Array.isArray(parsed.reviews)) throw new Error("Timeline vision returned an invalid review.");
+  return { model, reviews: parsed.reviews };
+}
+
+function applyMemeBeats(editPlan, reviews, maximum = 3) {
+  if (!editPlan?.segments?.length) return 0;
+  const ranked = reviews
+    .filter((review) => review.decision !== "remove" && Number(review.memeScore) >= 78)
+    .sort((a, b) => Number(b.memeScore) - Number(a.memeScore));
+  let applied = 0;
+  for (const review of ranked) {
+    const segment = editPlan.segments.find((item) => overlapSeconds(item.start, item.end, review.start, review.end) >= 1);
+    if (!segment || segment.effect || segment.end - segment.start < 2) continue;
+    segment.effect = "meme-punch";
+    segment.memeReason = String(review.reason || "High-confidence visual reaction beat").slice(0, 300);
+    applied += 1;
+    if (applied >= maximum) break;
+  }
+  return applied;
+}
 function applyDialogueContext(candidates, dialogueCues, direction) {
   const keywords = directionKeywords(direction);
   for (const candidate of candidates) {
@@ -211,7 +327,9 @@ async function extractCandidateFrames(sourcePath, candidates, ffmpegPath, tempor
   const images = [];
   for (let index = 0; index < candidates.length; index += 1) {
     const candidate = candidates[index];
-    const timestamp = candidate.start + Math.min(3, Math.max(0.2, (candidate.end - candidate.start) / 2));
+    const timestamp = Number.isFinite(candidate.sampleAt)
+      ? candidate.sampleAt
+      : candidate.start + Math.min(3, Math.max(0.2, (candidate.end - candidate.start) / 2));
     const framePath = path.join(temporaryDirectory, `candidate-${index}.jpg`);
     await execFileAsync(ffmpegPath, [
       "-y", "-ss", String(timestamp), "-i", sourcePath,
@@ -258,6 +376,8 @@ function createLocalAi({ resolveMediaTool, probeDuration, cleanText }) {
     const sourcePath = cleanText(payload?.sourcePath, "", 2000);
     if (!path.isAbsolute(sourcePath)) throw new Error("Choose a local source video before analysis.");
     await fs.access(sourcePath);
+    const reportProgress = (percent, phase, detail) => _event?.sender?.send?.("video:production-progress", { percent, phase, detail });
+    reportProgress(2, "analysis-start", "Reading the full source duration");
     const ffmpegPath = await resolveMediaTool("ffmpeg");
     const ffprobePath = await resolveMediaTool("ffprobe");
     const duration = await probeDuration(sourcePath, ffprobePath);
@@ -266,16 +386,20 @@ function createLocalAi({ resolveMediaTool, probeDuration, cleanText }) {
     const candidateLength = mode === "edit"
       ? clamp(Number(payload?.segmentLength) || Math.min(12, targetLength / 3), 4, Math.min(20, duration))
       : targetLength;
+    const shouldScanEveryFrame = mode !== "edit" || duration <= 600;
     const [sceneResult, silenceResult] = await Promise.all([
-      collectProcessOutput(ffmpegPath, [
-        "-hide_banner", "-i", sourcePath,
-        "-vf", "select=gt(scene\\,0.22),showinfo", "-an", "-f", "null", "-",
-      ]),
+      shouldScanEveryFrame
+        ? collectProcessOutput(ffmpegPath, [
+          "-hide_banner", "-i", sourcePath,
+          "-vf", "select=gt(scene\\,0.22),showinfo", "-an", "-f", "null", "-",
+        ])
+        : Promise.resolve({ stdout: "", stderr: "" }),
       collectProcessOutput(ffmpegPath, [
         "-hide_banner", "-i", sourcePath,
         "-af", "silencedetect=noise=-35dB:d=0.35", "-vn", "-f", "null", "-",
       ]),
     ]);
+    reportProgress(10, "signal-scan", "Audio pauses and visual signals measured");
     const sceneTimes = parseSceneTimes(sceneResult.stderr);
     const silences = parseSilences(silenceResult.stderr, duration);
     const temporaryDirectory = path.join(app.getPath("temp"), `grayfox-analysis-${process.pid}-${Date.now()}`);
@@ -301,6 +425,9 @@ function createLocalAi({ resolveMediaTool, probeDuration, cleanText }) {
     let provider = "local-signals";
     let model = null;
     let fallbackReason = null;
+    const directionRules = extractDirectionRules(direction);
+    const timelineReviews = [];
+    let excludedRanges = [];
     try {
       const images = await extractCandidateFrames(sourcePath, candidates, ffmpegPath, temporaryDirectory);
       const vision = await requestOllamaVision(
@@ -322,23 +449,94 @@ function createLocalAi({ resolveMediaTool, probeDuration, cleanText }) {
       }
       candidates.sort((a, b) => b.score - a.score);
     } catch (error) {
-      model = null;
       fallbackReason = cleanText(error?.message, "Local vision model unavailable.", 500);
-      if (candidates[0]) {
-        candidates[0].note = `${candidates[0].note}. Vision model unavailable; ranked from measured scene and audio signals.`;
-      }
-    } finally {
-      await fs.rm(temporaryDirectory, { recursive: true, force: true }).catch(() => {});
+      if (candidates[0]) candidates[0].note = `${candidates[0].note}. Vision model unavailable; ranked from measured scene and audio signals.`;
     }
+
+    if (mode === "edit" && (directionRules.mustRemove.length || directionRules.mustKeep.length)) {
+      const windows = buildTimelineWindows(duration, duration > 7200 ? 90 : 60);
+      const auditFailures = [];
+      const reviewedStarts = new Set();
+      const appendReviews = (items, sourceBatch) => {
+        for (const item of items || []) {
+          const window = sourceBatch[Number(item.index)];
+          if (!window || reviewedStarts.has(window.start)) continue;
+          const normalizedDecision = String(item.decision || "").trim().toLowerCase();
+          const modelDecision = ["keep", "remove", "neutral"].includes(normalizedDecision) ? normalizedDecision : "neutral";
+          const reason = cleanText(item.reason, "Visual timeline classification", 300);
+          const enforced = enforceVisibleDirectionDecision(
+            modelDecision,
+            normalizeVisionScore(item.confidence),
+            reason,
+            directionRules
+          );
+          timelineReviews.push({
+            start: window.start,
+            end: window.end,
+            decision: enforced.decision,
+            confidence: enforced.confidence,
+            semanticScore: normalizeVisionScore(item.semanticScore, 50),
+            memeScore: normalizeVisionScore(item.memeScore),
+            reason,
+            enforcedBy: enforced.enforcedBy,
+          });
+          reviewedStarts.add(window.start);
+        }
+      };
+      for (let offset = 0; offset < windows.length; offset += 6) {
+        const batch = windows.slice(offset, offset + 6);
+        try {
+          const images = await extractCandidateFrames(sourcePath, batch, ffmpegPath, temporaryDirectory);
+          const review = await requestOllamaTimelineReview(
+            batch,
+            images,
+            directionRules,
+            `${payload?.finalUse || ""}; ${payload?.tone || ""}; ${direction}`
+          );
+          model = review.model;
+          provider = "ollama-vision-timeline";
+          appendReviews(review.reviews, batch);
+          const missing = batch.map((window, index) => ({ window, image: images[index] }))
+            .filter((entry) => !reviewedStarts.has(entry.window.start));
+          if (missing.length) {
+            const retry = await requestOllamaTimelineReview(
+              missing.map((entry) => entry.window),
+              missing.map((entry) => entry.image),
+              directionRules,
+              `${payload?.finalUse || ""}; ${payload?.tone || ""}; ${direction}`
+            );
+            appendReviews(retry.reviews, missing.map((entry) => entry.window));
+          }
+          reportProgress(12 + Math.round(((offset + batch.length) / windows.length) * 33), "direction-audit", `Reviewed ${reviewedStarts.size} of ${windows.length} timeline samples`);
+        } catch (error) {
+          auditFailures.push(`batch ${offset / 6 + 1}: ${cleanText(error?.message, "unavailable", 160)}`);
+        }
+      }
+      excludedRanges = mergeExcludedTimelineRanges(timelineReviews);
+      if (auditFailures.length) fallbackReason = [fallbackReason, `Direction audit warnings: ${auditFailures.join("; ")}`].filter(Boolean).join(" ").slice(0, 1000);
+    }
+    const planningCandidates = [...candidates, ...timelineReviews
+      .filter((review) => review.decision !== "remove")
+      .map((review) => ({
+        start: review.start,
+        end: review.end,
+        score: review.decision === "keep" ? Math.max(80, review.semanticScore) : review.semanticScore,
+        memeScore: review.memeScore,
+        title: review.decision === "keep" ? "Direction-matched timeline moment" : "Reviewed timeline moment",
+        note: review.reason,
+      }))].sort((a, b) => b.score - a.score);
     const editPlan = mode === "edit" ? buildEditPlan({
-      candidates,
+      candidates: planningCandidates,
       silences: editingSilences,
       dialogueCues: dialogue.cues,
       sourceDuration: duration,
       desiredDuration: targetLength,
       direction,
       tone: cleanText(payload?.tone, "", 500),
+      excludedRanges,
     }) : null;
+    const memeBeatCount = applyMemeBeats(editPlan, timelineReviews);
+    await fs.rm(temporaryDirectory, { recursive: true, force: true }).catch(() => {});
     return {
       duration,
       targetLength,
@@ -346,6 +544,15 @@ function createLocalAi({ resolveMediaTool, probeDuration, cleanText }) {
       model,
       editPlan,
       fallbackReason,
+      directionRules,
+      excludedRanges,
+      directionAuditCount: timelineReviews.length,
+      directionAuditExpected: mode === "edit" && (directionRules.mustRemove.length || directionRules.mustKeep.length) ? buildTimelineWindows(duration, duration > 7200 ? 90 : 60).length : 0,
+      directionAuditCoverage: mode === "edit" && (directionRules.mustRemove.length || directionRules.mustKeep.length)
+        ? Number((timelineReviews.length / buildTimelineWindows(duration, duration > 7200 ? 90 : 60).length).toFixed(3))
+        : 1,
+      memeBeatCount,
+      timelineReviews,
       dialogueProvider: dialogue.provider,
       dialogueCueCount: dialogue.cues.length,
       dialogueFallbackReason: dialogue.fallbackReason,
@@ -368,4 +575,12 @@ module.exports = {
   parseSilences,
   parseSubtitleCues,
   requestOllamaVision,
+  requestOllamaTimelineReview,
+  extractDirectionRules,
+  buildTimelineWindows,
+  normalizeVisionScore,
+  enforceVisibleDirectionDecision,
+  hasPositiveVisibleMatch,
+  mergeExcludedTimelineRanges,
+  applyMemeBeats,
 };

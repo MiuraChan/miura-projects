@@ -20,7 +20,8 @@ function cleanSegments(rawSegments, fullDuration) {
   return rawSegments.slice(0, 64).map((segment) => {
     const start = Math.min(Math.max(0, Number(segment?.start) || 0), fullDuration - 0.05);
     const end = Math.min(Math.max(Number(segment?.end) || 0, start + 0.05), fullDuration);
-    return { start, end, role: String(segment?.role || "body").slice(0, 30) };
+    const effect = segment?.effect === "meme-punch" ? "meme-punch" : null;
+    return { start, end, role: String(segment?.role || "body").slice(0, 30), ...(effect ? { effect } : {}) };
   }).filter((segment) => segment.end - segment.start >= 0.05);
 }
 
@@ -130,7 +131,9 @@ function createEditRenderer({ resolveMediaTool, probeDuration, cleanText }) {
           "-map", "0:v:0",
           ...(hasAudio ? ["-map", "0:a:0?"] : []),
           "-sn", "-dn",
-          "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1",
+          "-vf", segment.effect === "meme-punch"
+            ? "scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1,crop=trunc(iw/1.08/2)*2:trunc(ih/1.08/2)*2:(iw-ow)/2:(ih-oh)/2,scale=trunc(iw*1.08/2)*2:trunc(ih*1.08/2)*2"
+            : "scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1",
           "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
           ...(hasAudio ? ["-c:a", "aac", "-b:a", "192k"] : ["-an"]),
           "-movflags", "+faststart",

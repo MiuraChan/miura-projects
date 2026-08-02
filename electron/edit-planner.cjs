@@ -70,6 +70,33 @@ function complementRanges(sourceDuration, removedRanges) {
   return kept;
 }
 
+function subtractRangesFromSegments(segments, removedRanges) {
+  const removed = mergeRanges(removedRanges);
+  return segments.flatMap((segment) => {
+    let pieces = [{ ...segment }];
+    for (const range of removed) {
+      pieces = pieces.flatMap((piece) => {
+        if (!rangesOverlap(piece, range)) return [piece];
+        const output = [];
+        if (range.start - piece.start >= 0.5) output.push({ ...piece, end: range.start });
+        if (piece.end - range.end >= 0.5) output.push({ ...piece, start: range.end });
+        return output;
+      });
+    }
+    return pieces;
+  });
+}
+
+function fillSegmentsToDuration(segments, sourceDuration, target, excludedRanges) {
+  const selected = mergeRanges(segments);
+  const currentDuration = selected.reduce((total, segment) => total + segment.end - segment.start, 0);
+  if (currentDuration >= target - 0.05) return trimSegmentsToDuration(selected, target);
+  const unavailable = mergeRanges([...(excludedRanges || []), ...selected]);
+  const available = complementRanges(sourceDuration, unavailable);
+  const additions = trimSegmentsToDuration(available, target - currentDuration)
+    .map((segment) => ({ ...segment, reason: "duration-fill-approved-content" }));
+  return trimSegmentsToDuration(mergeRanges([...selected, ...additions]), target);
+}
 function sliceSegmentsByContentTime(segments, startOffset, duration) {
   const output = [];
   let cursor = 0;
@@ -121,8 +148,8 @@ function assignRoles(segments) {
   }));
 }
 
-function buildLongFormSegments({ candidates, silences, sourceDuration, target, maximumSegments }) {
-  if (target >= sourceDuration - 0.05) {
+function buildLongFormSegments({ candidates, silences, sourceDuration, target, maximumSegments, excludedRanges = [] }) {
+  if (target >= sourceDuration - 0.05 && !excludedRanges.length) {
     return assignRoles([{ start: 0, end: sourceDuration, reason: "full-source-production" }]);
   }
 
@@ -172,7 +199,9 @@ function buildLongFormSegments({ candidates, silences, sourceDuration, target, m
     });
   }
 
-  segments = coalesceSegmentsToLimit(mergeRanges(segments), maximumSegments);
+  segments = subtractRangesFromSegments(segments, excludedRanges);
+  segments = fillSegmentsToDuration(segments, sourceDuration, target, excludedRanges);
+  if (!excludedRanges.length) segments = coalesceSegmentsToLimit(mergeRanges(segments), maximumSegments);
   segments = trimSegmentsToDuration(segments, target);
   return assignRoles(segments);
 }
@@ -198,10 +227,11 @@ function buildEditPlan({
   direction = "",
   tone = "",
   maximumSegments = 48,
+  excludedRanges = [],
 }) {
   const target = clamp(Number(desiredDuration) || sourceDuration, 2, sourceDuration);
   if (target > 120) {
-    const segments = buildLongFormSegments({ candidates, silences, sourceDuration, target, maximumSegments });
+    const segments = buildLongFormSegments({ candidates, silences, sourceDuration, target, maximumSegments, excludedRanges });
     const outputDuration = segments.reduce((total, segment) => total + (segment.end - segment.start), 0);
     return {
       strategy: `Duration-locked ${tone ? `${tone} ` : ""}long-form production`,
@@ -212,6 +242,8 @@ function buildEditPlan({
       removedDuration: Number(Math.max(0, sourceDuration - outputDuration).toFixed(3)),
       reordered: false,
       durationLocked: Math.abs(outputDuration - target) <= Math.max(1, target * 0.01),
+      excludedRanges: mergeRanges(excludedRanges),
+      hardExclusionsApplied: excludedRanges.length > 0,
     };
   }
 
@@ -265,6 +297,8 @@ function buildEditPlan({
 module.exports = {
   buildEditPlan,
   buildLongFormSegments,
+  subtractRangesFromSegments,
+  fillSegmentsToDuration,
   coalesceSegmentsToLimit,
   complementRanges,
   protectDialogueBoundaries,

@@ -958,3 +958,103 @@ describe("Mandatory direction audit gate", () => {
     expect(document.querySelector("#processing-curiosity").textContent).toContain("could not verify enough of the timeline");
   });
 });
+describe("Editable meme beats", () => {
+  it("shows, moves, rerenders and gates approval for AI meme decisions", async () => {
+    const desktop = {
+      chooseExportPath: vi.fn(),
+      saveWorkspace: vi.fn(async (workspace) => workspace),
+      produceEditedVideo: vi.fn().mockResolvedValue({ outputPath: "C:/Exports/meme-revision.mp4", duration: 20, segmentCount: 2 }),
+      restoreVideo: vi.fn().mockResolvedValue({ url: "file:///C:/Exports/meme-revision.mp4" }),
+      onProductionProgress: vi.fn(() => vi.fn()),
+    };
+    const { document, app } = setup("https://grayfox.local/", desktop);
+    await app.ready;
+    document.querySelector("#workspace-user-name").value = "Marco";
+    document.querySelector("#workspace-export-path").value = "C:/Exports";
+    await app.createWorkspace();
+    app.loadVideo({ name: "source.mp4", path: "C:/Videos/source.mp4", url: "file:///C:/Videos/source.mp4", duration: 60 });
+    app.state.firstCut = {
+      outputPath: "C:/Exports/first.mp4",
+      duration: 20,
+      targetDuration: 20,
+      approval: "pending",
+      editPlan: {
+        outputDuration: 20,
+        segments: [
+          { start: 10, end: 20, role: "hook", effect: "meme-punch", memeEnabled: true, memeStart: 12, memeEnd: 13.2, memeReason: "visible reaction" },
+          { start: 30, end: 40, role: "close" },
+        ],
+      },
+      analysis: { memeBeatCount: 1 },
+    };
+    app.renderMemeEditor();
+    app.updateReviewPanel();
+
+    expect(document.querySelector("#meme-editor").hidden).toBe(false);
+    expect(document.querySelector("#meme-editor-count").textContent).toContain("1 active");
+    document.querySelector('[data-meme-action="later"]').click();
+    expect(app.state.firstCut.editPlan.segments[0].memeStart).toBe(13);
+    expect(await app.approveFirstCut()).toBe(false);
+    expect(document.querySelector("#toast").textContent).toContain("Apply or restore");
+
+    const result = await app.applyMemeChanges();
+    expect(result.outputPath).toBe("C:/Exports/meme-revision.mp4");
+    expect(desktop.produceEditedVideo).toHaveBeenCalledWith(expect.objectContaining({
+      segments: expect.arrayContaining([expect.objectContaining({ memeStart: 13, memeEnabled: true })]),
+    }));
+    expect(app.state.memeEditsDirty).toBe(false);
+    expect(await app.approveFirstCut()).toBe(true);
+  });
+
+  it("can remove and restore a suggested meme without deleting its position", () => {
+    const { document, app } = setup();
+    app.state.firstCut = {
+      outputPath: "cut.mp4",
+      duration: 10,
+      approval: "pending",
+      editPlan: { segments: [{ start: 1, end: 9, effect: "meme-punch", memeEnabled: true, memeStart: 3, memeEnd: 4.2 }] },
+      analysis: { memeBeatCount: 1 },
+    };
+    app.renderMemeEditor();
+    document.querySelector('[data-meme-action="toggle"]').click();
+    expect(app.state.firstCut.editPlan.segments[0]).toEqual(expect.objectContaining({ memeEnabled: false, memeStart: 3 }));
+    document.querySelector('[data-meme-action="toggle"]').click();
+    expect(app.state.firstCut.editPlan.segments[0].memeEnabled).toBe(true);
+  });
+});
+describe("Persisted meme review", () => {
+  it("restores meme positions, approval state and rendered preview with the project", async () => {
+    const desktop = {
+      restoreVideo: vi.fn(async (filePath) => ({ url: filePath.includes("approved") ? "file:///C:/Exports/approved.mp4" : "file:///C:/Videos/source.mp4" })),
+      onProductionProgress: vi.fn(() => vi.fn()),
+    };
+    const { document, app } = setup("https://grayfox.local/", desktop);
+    const project = {
+      id: "persisted-memes",
+      name: "Persisted memes",
+      status: "Approved",
+      view: "video-ops",
+      source: { name: "source.mp4", path: "C:/Videos/source.mp4", duration: 60 },
+      editor: { finalUse: "YouTube", targetMinutes: 1, direction: "Keep the story", tokens: ["Direct"] },
+      editReview: {
+        outputPath: "C:/Exports/approved.mp4",
+        duration: 20,
+        targetDuration: 20,
+        approval: "approved",
+        approvedAt: "2026-08-02T20:00:00.000Z",
+        segments: [
+          { start: 4, end: 10, role: "hook", effect: "meme-punch", memeEnabled: true, memeStart: 5.5, memeEnd: 6.7 },
+          { start: 20, end: 34, role: "close" },
+        ],
+      },
+    };
+
+    await app.restoreProject(project);
+
+    expect(app.state.firstCut.approval).toBe("approved");
+    expect(app.state.firstCut.editPlan.segments[0]).toEqual(expect.objectContaining({ memeStart: 5.5, memeEnabled: true }));
+    expect(document.querySelector("#video-preview").src).toBe("file:///C:/Exports/approved.mp4");
+    expect(document.querySelector("#meme-editor").hidden).toBe(false);
+    expect(document.querySelector("#review-status").textContent).toBe("Approved");
+  });
+});

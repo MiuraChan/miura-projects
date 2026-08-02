@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import renderer from "../electron/edit-renderer.cjs";
 
-const { cleanSegments, concatFileEntry, formatTimestamp, summarizeFfmpegFailure } = renderer;
+const { cleanSegments, concatFileEntry, formatTimestamp, summarizeFfmpegFailure, videoFilterForSegment } = renderer;
 
 describe("Grayfox resilient edit renderer", () => {
   it("formats long-video ranges for actionable errors", () => {
@@ -30,16 +30,22 @@ describe("Grayfox resilient edit renderer", () => {
     ]);
   });
 
+  it("places an enabled meme punch only inside its chosen local time", () => {
+    const filter = videoFilterForSegment({ start: 10, end: 20, effect: "meme-punch", memeEnabled: true, memeStart: 12.5, memeEnd: 13.7 });
+    expect(filter).toContain("between(t,2.500,3.700)");
+    expect(videoFilterForSegment({ start: 10, end: 20, effect: "meme-punch", memeEnabled: false })).not.toContain("overlay");
+  });
   it("writes concat entries with portable forward slashes", () => {
     expect(concatFileEntry("C:\\Grayfox\\segment-001.mp4")).toBe("file 'C:/Grayfox/segment-001.mp4'");
   });
 
   it("preserves only approved meme punch effects", () => {
     expect(cleanSegments([
-      { start: 1, end: 4, role: "body", effect: "meme-punch" },
+      { start: 1, end: 4, role: "body", effect: "meme-punch", memeStart: 2, memeEnd: 3.2 },
       { start: 5, end: 8, role: "body", effect: "unknown" },
     ], 10)).toEqual([
-      { start: 1, end: 4, role: "body", effect: "meme-punch" },
+      { start: 1, end: 4, role: "body", effect: "meme-punch", memeEnabled: true, memeStart: 2, memeEnd: 3.2 },
       { start: 5, end: 8, role: "body" },
     ]);
-  });});
+  });
+});

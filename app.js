@@ -26,6 +26,7 @@ function createGrayfoxApp(doc, win) {
     projectThumbnail: null,
     thumbnailCaptureHandler: null,
     previewRepresentsSource: false,
+    memeEditsDirty: false,
   };
 
   const urlParams = new win.URLSearchParams(win.location.search);
@@ -74,6 +75,10 @@ function createGrayfoxApp(doc, win) {
     processingBar: doc.querySelector("#processing-bar"),
     processingCuriosity: doc.querySelector("#processing-curiosity"),
     editPlanSummary: doc.querySelector("#edit-plan-summary"),
+    memeEditor: doc.querySelector("#meme-editor"),
+    memeBeatList: doc.querySelector("#meme-beat-list"),
+    memeEditorCount: doc.querySelector("#meme-editor-count"),
+    applyMemeEdits: doc.querySelector("#apply-meme-edits"),
     replaceVideo: doc.querySelector("#replace-video"),
     trimStart: doc.querySelector("#trim-start"),
     trimEnd: doc.querySelector("#trim-end"),
@@ -438,6 +443,14 @@ function createGrayfoxApp(doc, win) {
         start: Math.max(0, Number(elements.trimStart.value) || 0),
         end: Math.max(0, Number(elements.trimEnd.value) || 0),
       },
+      editReview: state.firstCut?.outputPath ? {
+        outputPath: state.firstCut.outputPath,
+        duration: Number(state.firstCut.duration) || 0,
+        targetDuration: Number(state.firstCut.targetDuration) || 0,
+        approval: state.firstCut.approval || "pending",
+        approvedAt: state.firstCut.approvedAt || null,
+        segments: (state.firstCut.editPlan?.segments || state.firstCut.segments || []).map((segment) => ({ ...segment })),
+      } : null,
       lastExportPath: state.lastExportPath,
       thumbnail: state.projectThumbnail,
       updatedAt: new Date().toISOString(),
@@ -483,6 +496,24 @@ function createGrayfoxApp(doc, win) {
       elements.empty.querySelector("h2").textContent = `Reconnect ${state.source.name}`;
       elements.empty.querySelector("p").textContent = "The project data is safe; browsers cannot reopen local video bytes automatically.";
     }
+    if (project.editReview?.outputPath) {
+      const segments = Array.isArray(project.editReview.segments) ? project.editReview.segments.map((segment) => ({ ...segment })) : [];
+      state.firstCut = {
+        ...project.editReview,
+        editPlan: { segments, outputDuration: Number(project.editReview.duration) || 0 },
+        analysis: { memeBeatCount: segments.filter((segment) => segment.effect === "meme-punch" && segment.memeEnabled !== false).length },
+      };
+      state.memeEditsDirty = false;
+      if (desktop?.restoreVideo) {
+        const restoredCut = await desktop.restoreVideo(project.editReview.outputPath);
+        if (restoredCut?.url) {
+          state.previewRepresentsSource = false;
+          elements.preview.src = restoredCut.url;
+        }
+      }
+      renderMemeEditor();
+      updateReviewPanel();
+    }
     activateView(project.view || "video-ops");
     updateBrief();
   }
@@ -505,6 +536,9 @@ function createGrayfoxApp(doc, win) {
     state.file = file;
     state.transcript = null;
     state.projectThumbnail = null;
+    state.firstCut = null;
+    state.memeEditsDirty = false;
+    if (elements.memeEditor) elements.memeEditor.hidden = true;
     if (elements.dialogueSourceStatus) elements.dialogueSourceStatus.textContent = "Auto-detect embedded or matching .srt/.vtt";
     state.source = {
       name: file.name || "Video",
@@ -787,6 +821,105 @@ function createGrayfoxApp(doc, win) {
       : "");
   }
 
+  function memeSegments(editPlan = state.firstCut?.editPlan) {
+    return (editPlan?.segments || []).map((segment, index) => ({ segment, index }))
+      .filter(({ segment }) => segment.effect === "meme-punch");
+  }
+
+  function renderMemeEditor() {
+    if (!elements.memeEditor || !elements.memeBeatList) return;
+    const beats = memeSegments();
+    elements.memeEditor.hidden = !beats.length;
+    const activeCount = beats.filter(({ segment }) => segment.memeEnabled !== false).length;
+    elements.memeEditorCount.textContent = `${activeCount} active · ${beats.length} suggested`;
+    elements.applyMemeEdits.disabled = !state.memeEditsDirty;
+    elements.memeBeatList.innerHTML = beats.map(({ segment, index }, beatIndex) => {
+      const enabled = segment.memeEnabled !== false;
+      const time = Number.isFinite(Number(segment.memeStart)) ? Number(segment.memeStart) : Number(segment.start);
+      return `<article class="meme-beat${enabled ? "" : " disabled"}" data-meme-segment="${index}">
+        <span class="meme-beat-signal" aria-hidden="true"></span>
+        <div class="meme-beat-copy"><strong>Meme beat ${beatIndex + 1}</strong><span class="meme-beat-time">At <input type="number" step="0.5" min="${Number(segment.start).toFixed(1)}" max="${Math.max(segment.start, segment.end - 0.2).toFixed(1)}" value="${time.toFixed(1)}" data-meme-time aria-label="Meme beat ${beatIndex + 1} source time in seconds"> sec</span></div>
+        <div class="meme-beat-actions"><button type="button" data-meme-action="earlier" title="Move 1 second earlier">−1</button><button type="button" data-meme-action="later" title="Move 1 second later">+1</button><button type="button" data-meme-action="toggle">${enabled ? "Remove" : "Restore"}</button></div>
+      </article>`;
+    }).join("");
+  }
+
+  function updateMemeBeat(segmentIndex, { delta = 0, time = null, toggle = false } = {}) {
+    const segment = state.firstCut?.editPlan?.segments?.[Number(segmentIndex)];
+    if (!segment || segment.effect !== "meme-punch") return false;
+    if (toggle) segment.memeEnabled = segment.memeEnabled === false;
+    if (delta || time != null) {
+      const current = Number.isFinite(Number(segment.memeStart)) ? Number(segment.memeStart) : Number(segment.start);
+      const requested = time == null ? current + delta : Number(time);
+      segment.memeStart = Number(Math.min(Math.max(requested, segment.start), Math.max(segment.start, segment.end - 0.2)).toFixed(3));
+      segment.memeEnd = Number(Math.min(segment.end, segment.memeStart + 1.2).toFixed(3));
+    }
+    state.memeEditsDirty = true;
+    if (state.firstCut) state.firstCut.approval = "pending";
+    renderMemeEditor();
+    updateReviewPanel();
+    elements.reviewStatus.textContent = "Meme changes not rendered";
+    showToast("Meme beat updated. Apply changes to render it.");
+    return true;
+  }
+
+  async function applyMemeChanges() {
+    const segments = state.firstCut?.editPlan?.segments || [];
+    if (!state.memeEditsDirty || !segments.length) return state.firstCut;
+    if (!desktop?.produceEditedVideo || segments.length < 2) {
+      showToast("This meme revision needs the Grayfox multi-segment desktop renderer.");
+      return null;
+    }
+    elements.applyMemeEdits.disabled = true;
+    elements.processingPanel.hidden = false;
+    elements.processingTitle.textContent = "Applying meme decisions";
+    elements.processingEta.textContent = "Rendering locally…";
+    try {
+      const result = await desktop.produceEditedVideo({
+        sourcePath: state.source.path,
+        exportPath: state.workspace.exportPath,
+        projectName: `${state.projectName}-meme-revision`,
+        segments,
+        expectedDuration: Number(state.firstCut.targetDuration) || Number(state.firstCut.editPlan.outputDuration) || 0,
+      });
+      state.firstCut = { ...state.firstCut, ...result, approval: "pending" };
+      state.memeEditsDirty = false;
+      if (desktop.restoreVideo) {
+        const rendered = await desktop.restoreVideo(result.outputPath);
+        if (rendered?.url) {
+          state.previewRepresentsSource = false;
+          elements.preview.src = rendered.url;
+        }
+      }
+      completeFirstCut(result);
+      renderMemeEditor();
+      updateReviewPanel();
+      showToast("Meme changes rendered. Review the cut before approval.");
+      return state.firstCut;
+    } catch (error) {
+      elements.processingTitle.textContent = "Meme revision failed";
+      elements.processingCuriosity.textContent = error.message || "Grayfox could not render the meme changes.";
+      elements.applyMemeEdits.disabled = false;
+      showToast(elements.processingCuriosity.textContent);
+      return null;
+    }
+  }
+  elements.memeBeatList?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-meme-action]");
+    const card = button?.closest("[data-meme-segment]");
+    if (!button || !card) return;
+    const action = button.dataset.memeAction;
+    updateMemeBeat(card.dataset.memeSegment, {
+      delta: action === "earlier" ? -1 : (action === "later" ? 1 : 0),
+      toggle: action === "toggle",
+    });
+  });
+  elements.memeBeatList?.addEventListener("change", (event) => {
+    const input = event.target.closest("[data-meme-time]");
+    const card = input?.closest("[data-meme-segment]");
+    if (input && card) updateMemeBeat(card.dataset.memeSegment, { time: input.value });
+  });
+  elements.applyMemeEdits?.addEventListener("click", applyMemeChanges);
   function startFirstCut() {
     state.processing = { progress: 0, outputPath: null };
     elements.createCut.closest(".button-with-help").hidden = true;
@@ -848,6 +981,10 @@ function createGrayfoxApp(doc, win) {
   }
 
   async function approveFirstCut() {
+    if (state.memeEditsDirty) {
+      showToast("Apply or restore the meme changes before approving this cut.");
+      return false;
+    }
     if (!state.firstCut?.outputPath) {
       showToast("Render a first cut before approving it.");
       return false;
@@ -906,6 +1043,7 @@ function createGrayfoxApp(doc, win) {
         segments: state.firstCut.editPlan?.segments || state.firstCut.segments || [],
         direction: elements.direction.value.trim(),
         tone: state.tokens,
+        memeBeats: memeSegments().map(({ segment, index }) => ({ segmentIndex: index, start: segment.memeStart, end: segment.memeEnd, enabled: segment.memeEnabled !== false, reason: segment.memeReason || "" })),
       });
       elements.handoffStatus.textContent = result.message || `Created ${result.path}`;
       showToast(result.message || "Handoff ready.");
@@ -1003,6 +1141,8 @@ function createGrayfoxApp(doc, win) {
         result.durationWarning = `Rendered ${formatClipTime(result.duration)} of requested ${formatClipTime(effectiveTargetLength)}.`;
       }
       state.firstCut = { ...result, analysis: state.analysis, editPlan, selectedRange, approval: "pending", revisionFeedback: state.revisionFeedback };
+      state.memeEditsDirty = false;
+      renderMemeEditor();
       if (desktop.restoreVideo) {
         const rendered = await desktop.restoreVideo(result.outputPath);
         if (rendered?.url) {
@@ -1315,6 +1455,10 @@ function createGrayfoxApp(doc, win) {
     createApprovedHandoff,
     chooseDialogueTranscript,
     captureProjectThumbnail,
+    memeSegments,
+    renderMemeEditor,
+    updateMemeBeat,
+    applyMemeChanges,
   };
 }
 

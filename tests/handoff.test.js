@@ -8,7 +8,7 @@ const { afterEffectsScript, createHandoff, premiereXml } = handoff;
 
 describe("Grayfox approved edit handoffs", () => {
   const segments = [
-    { start: 4, end: 9, role: "hook" },
+    { start: 4, end: 9, role: "hook", effect: "meme-punch", memeEnabled: true, memeStart: 5.5, memeEnd: 6.7, memeReason: "visible reaction" },
     { start: 20, end: 27, role: "close" },
   ];
 
@@ -19,6 +19,8 @@ describe("Grayfox approved edit handoffs", () => {
     expect(xml).toContain("<in>120</in>");
     expect(xml).toContain("<out>270</out>");
     expect(xml).toContain("interview.mp4");
+    expect(xml).toContain("Grayfox Meme Punch");
+    expect(xml).toContain("visible reaction");
   });
 
   it("creates an After Effects script with one layer per approved cut", () => {
@@ -48,6 +50,7 @@ describe("Grayfox approved edit handoffs", () => {
       expect(fs.existsSync(result.videoPath)).toBe(true);
       const manifest = JSON.parse(fs.readFileSync(path.join(result.path, "publishing.json"), "utf8"));
       expect(manifest).toEqual(expect.objectContaining({ platform: "youtube", cuts: 2, status: "ready-for-user-confirmed-upload" }));
+      expect(manifest.memeBeats).toEqual([expect.objectContaining({ start: 5.5, end: 6.7, effect: "meme-punch" })]);
       expect(shell.showItemInFolder).toHaveBeenCalledWith(result.videoPath);
       expect(shell.openExternal).toHaveBeenCalledWith("https://studio.youtube.com/");
     } finally {

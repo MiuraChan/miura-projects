@@ -20,6 +20,11 @@ function normalizedSegments(payload) {
     start: Math.max(0, Number(segment.start) || 0),
     end: Math.max(Number(segment.end) || 0, Number(segment.start) || 0),
     role: String(segment.role || "body"),
+    effect: segment.effect === "meme-punch" ? "meme-punch" : null,
+    memeEnabled: segment.effect === "meme-punch" && segment.memeEnabled !== false,
+    memeStart: Number(segment.memeStart),
+    memeEnd: Number(segment.memeEnd),
+    memeReason: String(segment.memeReason || ""),
   })).filter((segment) => segment.end - segment.start > 0.04);
 }
 
@@ -37,7 +42,10 @@ function premiereXml({ sourcePath, projectName, segments, fps = 30 }) {
   const renderTrack = (prefix, mediaType) => entries.map((entry, index) => {
     const sourceTrack = mediaType === "audio" ? "<sourcetrack><mediatype>audio</mediatype><trackindex>1</trackindex></sourcetrack>" : "";
     const file = prefix === "v" && index === 0 ? fullFile : '<file id="source-1"/>';
-    return `<clipitem id="${prefix}-clip-${index + 1}"><name>${escapeXml(`${projectName} ${entry.segment.role}`)}</name><start>${entry.startFrame}</start><end>${entry.endFrame}</end><in>${entry.inFrame}</in><out>${entry.inFrame + entry.durationFrames}</out>${file}${sourceTrack}</clipitem>`;
+    const marker = prefix === "v" && entry.segment.memeEnabled && Number.isFinite(entry.segment.memeStart)
+      ? `<marker><name>Grayfox Meme Punch</name><comment>${escapeXml(entry.segment.memeReason || "AI suggested meme beat")}</comment><in>${Math.round(entry.segment.memeStart * fps)}</in><out>${Math.round((Number(entry.segment.memeEnd) || entry.segment.memeStart + 1.2) * fps)}</out></marker>`
+      : "";
+    return `<clipitem id="${prefix}-clip-${index + 1}"><name>${escapeXml(`${projectName} ${entry.segment.role}`)}</name><start>${entry.startFrame}</start><end>${entry.endFrame}</end><in>${entry.inFrame}</in><out>${entry.inFrame + entry.durationFrames}</out>${file}${sourceTrack}${marker}</clipitem>`;
   }).join("");
   return `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE xmeml><xmeml version="4"><sequence><name>${escapeXml(projectName)}</name><duration>${timelineFrame}</duration><rate><timebase>${fps}</timebase><ntsc>FALSE</ntsc></rate><media><video><track>${renderTrack("v", "video")}</track></video><audio><track>${renderTrack("a", "audio")}</track></audio></media></sequence></xmeml>`;
 }
@@ -53,7 +61,12 @@ function afterEffectsScript({ sourcePath, projectName, segments, fps = 30 }) {
     const segment = items[index];
     const length = segment.end - segment.start;
     const start = items.slice(0, index).reduce((total, item) => total + item.end - item.start, 0);
-    layerLines.push(`var layer${index} = comp.layers.add(footage); layer${index}.startTime = ${start.toFixed(3)} - ${segment.start.toFixed(3)}; layer${index}.inPoint = ${start.toFixed(3)}; layer${index}.outPoint = ${(start + length).toFixed(3)}; layer${index}.name = "Cut ${index + 1} - ${String(segment.role).replace(/"/g, "")}";`);
+    const memeStart = start + (Number(segment.memeStart) - segment.start);
+    const memeEnd = start + (Number(segment.memeEnd) - segment.start);
+    const memeKeys = segment.memeEnabled && Number.isFinite(memeStart) && Number.isFinite(memeEnd)
+      ? ` var scale${index} = layer${index}.property("Transform").property("Scale"); scale${index}.setValueAtTime(${Math.max(start, memeStart - 0.08).toFixed(3)}, [100,100]); scale${index}.setValueAtTime(${memeStart.toFixed(3)}, [108,108]); scale${index}.setValueAtTime(${memeEnd.toFixed(3)}, [108,108]); scale${index}.setValueAtTime(${Math.min(start + length, memeEnd + 0.08).toFixed(3)}, [100,100]); var marker${index} = new MarkerValue("Grayfox Meme Punch"); layer${index}.property("Marker").setValueAtTime(${memeStart.toFixed(3)}, marker${index});`
+      : "";
+    layerLines.push(`var layer${index} = comp.layers.add(footage); layer${index}.startTime = ${start.toFixed(3)} - ${segment.start.toFixed(3)}; layer${index}.inPoint = ${start.toFixed(3)}; layer${index}.outPoint = ${(start + length).toFixed(3)}; layer${index}.name = "Cut ${index + 1} - ${String(segment.role).replace(/"/g, "")}";${memeKeys}`);
     cursor += length;
   }
   return `app.beginUndoGroup("Grayfox approved cut");\nif (!app.project) app.newProject();\nvar sourceFile = new File("${safePath}");\nvar footage = app.project.importFile(new ImportOptions(sourceFile));\nvar comp = app.project.items.addComp("${safeProject}", footage.width, footage.height, 1, ${Math.max(duration, cursor).toFixed(3)}, ${fps});\n${layerLines.join("\n")}\napp.endUndoGroup();\n`;
@@ -101,6 +114,7 @@ function createHandoff({ shell }) {
       approvedAt: payload?.approvedAt || new Date().toISOString(),
       duration: Number(payload?.duration) || 0,
       cuts: segments.length,
+      memeBeats: segments.filter((segment) => segment.memeEnabled).map((segment) => ({ start: segment.memeStart, end: segment.memeEnd, effect: segment.effect })),
       direction: String(payload?.direction || ""),
       tone: Array.isArray(payload?.tone) ? payload.tone : [],
       video: path.basename(videoPath),

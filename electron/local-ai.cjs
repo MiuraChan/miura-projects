@@ -180,6 +180,9 @@ function applyMemeBeats(editPlan, reviews, maximum = 3) {
     const segment = editPlan.segments.find((item) => overlapSeconds(item.start, item.end, review.start, review.end) >= 1);
     if (!segment || segment.effect || segment.end - segment.start < 2) continue;
     segment.effect = "meme-punch";
+    segment.memeEnabled = true;
+    segment.memeStart = Number(Math.max(segment.start, review.start).toFixed(3));
+    segment.memeEnd = Number(Math.min(segment.end, segment.memeStart + 1.2).toFixed(3));
     segment.memeReason = String(review.reason || "High-confidence visual reaction beat").slice(0, 300);
     applied += 1;
     if (applied >= maximum) break;

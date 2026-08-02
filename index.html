@@ -89,7 +89,14 @@
                   <small>MP4, MOV, WebM · processed on this device</small>
                 </button>
               </div>
-              <input type="file" id="video-input" accept="video/*" hidden />
+              <section class="meme-editor" id="meme-editor" hidden aria-live="polite">
+                <div class="meme-editor-heading">
+                  <div><span class="eyebrow">AI MEME BEATS</span><strong>Review before approval</strong></div>
+                  <span id="meme-editor-count">0 active</span>
+                </div>
+                <div id="meme-beat-list" class="meme-beat-list"></div>
+                <button class="secondary-button compact-button" id="apply-meme-edits" type="button" disabled>Apply meme changes</button>
+              </section>              <input type="file" id="video-input" accept="video/*" hidden />
               <input id="trim-start" type="hidden" value="0" />
               <input id="trim-end" type="hidden" value="0" />
             </section>

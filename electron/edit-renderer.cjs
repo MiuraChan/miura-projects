@@ -21,10 +21,20 @@ function cleanSegments(rawSegments, fullDuration) {
     const start = Math.min(Math.max(0, Number(segment?.start) || 0), fullDuration - 0.05);
     const end = Math.min(Math.max(Number(segment?.end) || 0, start + 0.05), fullDuration);
     const effect = segment?.effect === "meme-punch" ? "meme-punch" : null;
-    return { start, end, role: String(segment?.role || "body").slice(0, 30), ...(effect ? { effect } : {}) };
+    const memeEnabled = effect ? segment?.memeEnabled !== false : false;
+    const memeStart = Math.min(Math.max(Number(segment?.memeStart) || start, start), end);
+    const memeEnd = Math.min(Math.max(Number(segment?.memeEnd) || memeStart + 1.2, memeStart + 0.1), end);
+    return { start, end, role: String(segment?.role || "body").slice(0, 30), ...(effect ? { effect, memeEnabled, memeStart, memeEnd } : {}) };
   }).filter((segment) => segment.end - segment.start >= 0.05);
 }
 
+function videoFilterForSegment(segment) {
+  const base = "scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1";
+  if (segment.effect !== "meme-punch" || segment.memeEnabled === false) return base;
+  const localStart = Math.max(0, Number(segment.memeStart) - Number(segment.start));
+  const localEnd = Math.max(localStart + 0.1, Number(segment.memeEnd) - Number(segment.start));
+  return `${base},split[base][zoom];[zoom]scale=trunc(iw*1.08/2)*2:trunc(ih*1.08/2)*2,crop=trunc(iw/1.08/2)*2:trunc(ih/1.08/2)*2:(iw-ow)/2:(ih-oh)/2[zoomed];[base][zoomed]overlay=0:0:enable='between(t,${localStart.toFixed(3)},${localEnd.toFixed(3)})'`;
+}
 function formatTimestamp(rawSeconds) {
   const seconds = Math.max(0, Math.floor(Number(rawSeconds) || 0));
   const hours = Math.floor(seconds / 3600);
@@ -131,9 +141,7 @@ function createEditRenderer({ resolveMediaTool, probeDuration, cleanText }) {
           "-map", "0:v:0",
           ...(hasAudio ? ["-map", "0:a:0?"] : []),
           "-sn", "-dn",
-          "-vf", segment.effect === "meme-punch"
-            ? "scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1,crop=trunc(iw/1.08/2)*2:trunc(ih/1.08/2)*2:(iw-ow)/2:(ih-oh)/2,scale=trunc(iw*1.08/2)*2:trunc(ih*1.08/2)*2"
-            : "scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1",
+          "-vf", videoFilterForSegment(segment),
           "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
           ...(hasAudio ? ["-c:a", "aac", "-b:a", "192k"] : ["-an"]),
           "-movflags", "+faststart",
@@ -226,6 +234,7 @@ function createEditRenderer({ resolveMediaTool, probeDuration, cleanText }) {
 
 module.exports = {
   cleanSegments,
+  videoFilterForSegment,
   concatFileEntry,
   createEditRenderer,
   formatTimestamp,

@@ -33,6 +33,7 @@ function cleanProject(project, exportPath) {
   const editor = project?.editor || {};
   const shorts = project?.shorts || {};
   const trim = project?.trim || {};
+  const editReview = project?.editReview || null;
   return {
     id: cleanText(project?.id, `project-${Date.now()}`, 120),
     name: cleanText(project?.name, "Untitled edit", 80),
@@ -55,6 +56,23 @@ function cleanProject(project, exportPath) {
       start: Math.max(0, Number(trim.start) || 0),
       end: Math.max(0, Number(trim.end) || 0),
     },
+    editReview: editReview && path.isAbsolute(String(editReview.outputPath || "")) ? {
+      outputPath: path.normalize(String(editReview.outputPath)),
+      duration: Math.max(0, Number(editReview.duration) || 0),
+      targetDuration: Math.max(0, Number(editReview.targetDuration) || 0),
+      approval: ["pending", "approved", "changes-requested"].includes(editReview.approval) ? editReview.approval : "pending",
+      approvedAt: cleanText(editReview.approvedAt, "", 80) || null,
+      segments: Array.isArray(editReview.segments) ? editReview.segments.slice(0, 64).map((segment) => ({
+        start: Math.max(0, Number(segment.start) || 0),
+        end: Math.max(0, Number(segment.end) || 0),
+        role: cleanText(segment.role, "body", 30),
+        effect: segment.effect === "meme-punch" ? "meme-punch" : null,
+        memeEnabled: segment.effect === "meme-punch" && segment.memeEnabled !== false,
+        memeStart: Math.max(0, Number(segment.memeStart) || 0),
+        memeEnd: Math.max(0, Number(segment.memeEnd) || 0),
+        memeReason: cleanText(segment.memeReason, "", 300),
+      })).filter((segment) => segment.end > segment.start) : [],
+    } : null,
     lastExportPath: cleanText(project?.lastExportPath, "", 2000) || null,
     thumbnail: typeof project?.thumbnail === "string"
       && /^data:image\/jpeg;base64,/i.test(project.thumbnail)

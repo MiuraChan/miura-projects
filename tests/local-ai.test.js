@@ -105,7 +105,7 @@ it("uses the installed LM Studio vision model with structured multimodal output"
   const result = await requestLmStudioVision([{ start: 0, end: 15 }], ["ZmFrZQ=="], "remove the first part where I watch the previous video");
   expect(result.provider).toBe("lm-studio-qwen3-vl");
   expect(result.model).toBe("qwen/qwen3-vl-4b");
-  const request = JSON.parse(fetch.mock.calls[0][1].body);
+  const request = JSON.parse(fetch.mock.calls.at(-1)[1].body);
   expect(request.response_format.type).toBe("json_schema");
   expect(request.messages[0].content[1].image_url.url).toMatch(/^data:image\/jpeg;base64,/);
 });
@@ -142,14 +142,15 @@ describe("Grayfox direction compliance", () => {
     expect(windows.at(-1).end).toBeCloseTo(4977.64, 2);
   });
 
-  it("samples opening-removal instructions more closely before returning to the regular audit", () => {
+  it("samples opening-only removal instructions every 20 seconds for the first twelve minutes", () => {
     const windows = buildDirectionAuditWindows(1800, { mustRemove: ["rimuovi prima parte in cui guardo il video precedente"] });
     expect(windows.slice(0, 3)).toEqual([
       { start: 0, end: 20, sampleAt: 10 },
       { start: 20, end: 40, sampleAt: 30 },
       { start: 40, end: 60, sampleAt: 50 },
     ]);
-    expect(windows.some((window) => window.start >= 720)).toBe(true);
+    expect(windows).toHaveLength(36);
+    expect(windows.at(-1).end).toBe(720);
   });
   it("merges consecutive high-confidence removal windows", () => {
     const ranges = mergeExcludedTimelineRanges([

@@ -135,7 +135,10 @@ function buildDirectionAuditWindows(duration, rules) {
   const regular = buildTimelineWindows(duration, duration > 7200 ? 90 : 60);
   if (!hasOpeningRemovalRule(rules)) return regular;
   const detailedEnd = Math.min(duration, 12 * 60);
-  const detailed = buildTimelineWindows(detailedEnd, 15);
+  const detailed = buildTimelineWindows(detailedEnd, 20);
+  const openingOnly = (rules?.mustKeep || []).length === 0
+    && (rules?.mustRemove || []).every((rule) => /\b(first part|opening|at the start|beginning|intro|prima parte|all'inizio|inizio|apertura)\b/i.test(rule));
+  if (openingOnly) return detailed;
   const remainder = regular.filter((window) => window.start >= detailedEnd);
   return [...detailed, ...remainder].slice(0, 160);
 }
@@ -165,16 +168,47 @@ function readAssistantJson(payload) {
   return JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, "").trim() || "{}");
 }
 
+const lmStudioPreparedInstances = new Map();
+
+async function prepareLmStudioVisionModel(endpoint, model) {
+  if (lmStudioPreparedInstances.has(model)) return lmStudioPreparedInstances.get(model);
+  const origin = new URL(endpoint).origin;
+  try {
+    const listResponse = await fetch(`${origin}/api/v1/models`, { signal: AbortSignal.timeout(15000) });
+    if (!listResponse.ok) return model;
+    const catalog = await listResponse.json();
+    const entry = (catalog.models || []).find((item) => item.key === model);
+    const suitable = entry?.loaded_instances?.find((instance) => Number(instance?.config?.context_length) >= 8192);
+    if (suitable?.id) {
+      lmStudioPreparedInstances.set(model, suitable.id);
+      return suitable.id;
+    }
+    const loadResponse = await fetch(`${origin}/api/v1/models/load`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ model, context_length: 8192, flash_attention: true }),
+      signal: AbortSignal.timeout(180000),
+    });
+    if (!loadResponse.ok) return model;
+    const loaded = await loadResponse.json();
+    const instanceId = loaded.instance_id || model;
+    lmStudioPreparedInstances.set(model, instanceId);
+    return instanceId;
+  } catch {
+    return model;
+  }
+}
 async function requestLmStudioJson({ prompt, images, schema, schemaName, timeout = 240000 }) {
   const model = process.env.GRAYFOX_LM_STUDIO_MODEL || "qwen/qwen3-vl-4b";
   const endpoint = process.env.GRAYFOX_LM_STUDIO_URL || "http://127.0.0.1:1234/v1/chat/completions";
+  const inferenceModel = await prepareLmStudioVisionModel(endpoint, model);
   const response = await fetch(endpoint, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      model,
+      model: inferenceModel,
       temperature: 0.05,
-      max_tokens: 1800,
+      max_tokens: 1200,
       messages: [{
         role: "user",
         content: [
@@ -242,7 +276,7 @@ const candidateRankingSchema = {
 };
 
 function timelineReviewPrompt(windows, rules, brief) {
-  return `You are the compliance editor for a long-form video. Each image is a chronological timeline sample. The user instructions are binding.
+  return `You are the compliance editor for a long-form video. The supplied contact sheet contains visibly numbered chronological timeline samples in row-major order. The user instructions are binding.
 MUST REMOVE: ${rules.mustRemove.join(" | ") || "none"}
 MUST KEEP/PRIORITIZE: ${rules.mustKeep.join(" | ") || "none"}
 FULL BRIEF AND VERIFIED TRANSCRIPT EXCERPTS: ${brief || "none"}
@@ -272,7 +306,7 @@ async function requestOllamaTimelineReview(windows, images, rules, brief) {
       options: { temperature: 0.05, num_ctx: 8192, num_predict: 1400 },
       messages: [{
         role: "user",
-        content: `You are the compliance editor for a long-form video. Each image is a chronological timeline sample. The user instructions are binding.\nMUST REMOVE: ${rules.mustRemove.join(" | ") || "none"}\nMUST KEEP/PRIORITIZE: ${rules.mustKeep.join(" | ") || "none"}\nFULL BRIEF: ${brief || "none"}\nIndexes: ${windows.map((window, index) => `${index}=${Math.round(window.start)}-${Math.round(window.end)}s`).join(", ")}.\nClassify what is visibly happening. A creator watching a nested Twitch/video player, an old episode, replay or previously recorded program is different from the creator speaking directly to camera. Gameplay is different from direct-to-camera storytelling. Mark remove only when the visible evidence matches a MUST REMOVE rule. Mark keep when it matches a MUST KEEP rule. Otherwise neutral. Never infer spoken words.\nReturn exactly one review for every supplied index, with no omissions. Return JSON only: {"reviews":[{"index":0,"decision":"keep|remove|neutral","confidence":0,"semanticScore":0,"memeScore":0,"reason":"max eight grounded words"}]}.`,
+        content: `You are the compliance editor for a long-form video. The supplied contact sheet contains visibly numbered chronological timeline samples in row-major order. The user instructions are binding.\nMUST REMOVE: ${rules.mustRemove.join(" | ") || "none"}\nMUST KEEP/PRIORITIZE: ${rules.mustKeep.join(" | ") || "none"}\nFULL BRIEF: ${brief || "none"}\nIndexes: ${windows.map((window, index) => `${index}=${Math.round(window.start)}-${Math.round(window.end)}s`).join(", ")}.\nClassify what is visibly happening. A creator watching a nested Twitch/video player, an old episode, replay or previously recorded program is different from the creator speaking directly to camera. Gameplay is different from direct-to-camera storytelling. Mark remove only when the visible evidence matches a MUST REMOVE rule. Mark keep when it matches a MUST KEEP rule. Otherwise neutral. Never infer spoken words.\nReturn exactly one review for every supplied index, with no omissions. Return JSON only: {"reviews":[{"index":0,"decision":"keep|remove|neutral","confidence":0,"semanticScore":0,"memeScore":0,"reason":"max eight grounded words"}]}.`,
         images,
       }],
     }),
@@ -459,10 +493,33 @@ async function extractCandidateFrames(sourcePath, candidates, ffmpegPath, tempor
   return images;
 }
 
+async function createFrameContactSheet(imageCount, ffmpegPath, temporaryDirectory, name = "contact-sheet") {
+  if (imageCount <= 1) {
+    const only = await fs.readFile(path.join(temporaryDirectory, "candidate-0.jpg"));
+    return [only.toString("base64")];
+  }
+  const columns = Math.min(3, imageCount);
+  const inputs = [];
+  const filters = [];
+  const labels = [];
+  for (let index = 0; index < imageCount; index += 1) {
+    inputs.push("-i", path.join(temporaryDirectory, `candidate-${index}.jpg`));
+    filters.push(`[${index}:v]scale=320:-2,pad=320:200:0:(200-ih)/2:color=white,drawtext=text='${index}':x=8:y=8:fontsize=22:fontcolor=0xC41E1E:box=1:boxcolor=white@0.85[v${index}]`);
+    labels.push(`[v${index}]`);
+  }
+  const layout = Array.from({ length: imageCount }, (_value, index) => `${(index % columns) * 320}_${Math.floor(index / columns) * 200}`).join("|");
+  const outputPath = path.join(temporaryDirectory, `${name}.jpg`);
+  await execFileAsync(ffmpegPath, [
+    "-y", ...inputs,
+    "-filter_complex", `${filters.join(";")};${labels.join("")}xstack=inputs=${imageCount}:layout=${layout}[sheet]`,
+    "-map", "[sheet]", "-frames:v", "1", "-update", "1", "-q:v", "4", outputPath,
+  ], { windowsHide: true, timeout: 120000 });
+  return [(await fs.readFile(outputPath)).toString("base64")];
+}
 async function requestLmStudioVision(candidates, images, brief) {
   const result = await requestLmStudioJson({
     prompt: `You are Grayfox, a practical video editor. Rank these candidate frames for this brief: ${brief || "find the strongest self-contained moment"}.
-Image order matches candidate indexes ${candidates.map((_candidate, index) => index).join(", ")}.
+The supplied contact sheet contains candidate tiles in row-major order, visibly numbered ${candidates.map((_candidate, index) => index).join(", ")}.
 Use scores from 0 to 100. Never invent dialogue or audio. Use only supplied transcript evidence. Evaluate visible subject, action, emotion, clarity, hook, direction match and brand safety. Meme score only describes whether a beat could work with a user-selected meme template; do not insert an effect.`,
     images,
     schema: candidateRankingSchema,
@@ -510,7 +567,7 @@ async function requestOllamaVision(candidates, images, brief) {
       messages: [{
         role: "user",
         content: `You are Grayfox, a practical video editor. Rank these candidate frames for this brief: ${brief || "find the strongest self-contained moment"}.
-Image order matches candidate indexes ${candidates.map((_candidate, index) => index).join(", ")}.
+The supplied contact sheet contains candidate tiles in row-major order, visibly numbered ${candidates.map((_candidate, index) => index).join(", ")}.
 Return JSON only: {"rankings":[{"index":0,"semanticScore":0,"memeScore":0,"title":"short factual title","rationale":"one grounded sentence","memeReason":"one sentence about reaction face, irony, punchline, or text-overlay potential"}]}.
 Use scores from 0 to 100. Never invent dialogue or audio. When the brief includes dialogue evidence, use only that supplied text. Evaluate visible subject, action, emotion, clarity, hook, direction match, brand safety, and meme potential.`,
         images,
@@ -590,6 +647,7 @@ function createLocalAi({ resolveMediaTool, probeDuration, cleanText }) {
       finalUse: cleanText(payload?.finalUse, "", 100),
       direction,
       dialogueCues: dialogue.cues,
+      limit: 6,
     });
     let provider = "local-signals";
     let model = null;
@@ -599,9 +657,10 @@ function createLocalAi({ resolveMediaTool, probeDuration, cleanText }) {
     let excludedRanges = [];
     try {
       const images = await extractCandidateFrames(sourcePath, candidates, ffmpegPath, temporaryDirectory);
+      const visionImages = await createFrameContactSheet(images.length, ffmpegPath, temporaryDirectory, "candidate-sheet");
       const vision = await requestLocalVision(
         candidates,
-        images,
+        visionImages,
         `${payload?.finalUse || ""}; ${payload?.tone || ""}; ${direction}; dialogue evidence: ${candidates.map((candidate, index) => `${index}: ${candidate.dialogueExcerpt || "none"}`).join(" | ")}`
       );
       provider = vision.provider;
@@ -652,13 +711,14 @@ function createLocalAi({ resolveMediaTool, probeDuration, cleanText }) {
           reviewedStarts.add(window.start);
         }
       };
-      for (let offset = 0; offset < windows.length; offset += 6) {
-        const batch = windows.slice(offset, offset + 6);
+      for (let offset = 0; offset < windows.length; offset += 8) {
+        const batch = windows.slice(offset, offset + 8);
         try {
           const images = await extractCandidateFrames(sourcePath, batch, ffmpegPath, temporaryDirectory);
+          const timelineImages = await createFrameContactSheet(images.length, ffmpegPath, temporaryDirectory, `timeline-sheet-${offset}`);
           const review = await requestLocalTimelineReview(
             batch,
-            images,
+            timelineImages,
             directionRules,
             `${payload?.finalUse || ""}; ${payload?.tone || ""}; ${direction}; timed transcript: ${timelineDialogueEvidence(batch, dialogue.cues)}`
           );
@@ -678,7 +738,7 @@ function createLocalAi({ resolveMediaTool, probeDuration, cleanText }) {
           }
           reportProgress(12 + Math.round(((offset + batch.length) / windows.length) * 33), "direction-audit", `Reviewed ${reviewedStarts.size} of ${windows.length} timeline samples`);
         } catch (error) {
-          auditFailures.push(`batch ${offset / 6 + 1}: ${cleanText(error?.message, "unavailable", 160)}`);
+          auditFailures.push(`batch ${offset / 8 + 1}: ${cleanText(error?.message, "unavailable", 160)}`);
         }
       }
       excludedRanges = mergeExcludedTimelineRanges(timelineReviews);
@@ -749,6 +809,7 @@ module.exports = {
   requestLmStudioTimelineReview,
   requestLocalVision,
   requestLocalTimelineReview,
+  createFrameContactSheet,
   extractDirectionRules,
   buildTimelineWindows,
   buildDirectionAuditWindows,

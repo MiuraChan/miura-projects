@@ -38,9 +38,9 @@ app.whenReady().then(async () => {
       exportPath,
       projectName: "verified-multicut",
       segments: [
-        { start: 0, end: 2, role: "hook", effect: "meme-punch" },
-        { start: 4, end: 6, role: "body" },
-        { start: 9, end: 11, role: "close" },
+        { start: 0, end: 2, role: "hook", effect: "meme-punch", memeStart: 0.4, memeEnd: 1.2 },
+        { start: 4, end: 6, role: "body", effect: "meme-monochrome", memeStart: 4.3, memeEnd: 5.1 },
+        { start: 9, end: 11, role: "close", effect: "meme-flash", memeStart: 9.4, memeEnd: 10.2 },
       ],
     });
 

@@ -35,17 +35,25 @@ describe("Grayfox resilient edit renderer", () => {
     expect(filter).toContain("between(t,2.500,3.700)");
     expect(videoFilterForSegment({ start: 10, end: 20, effect: "meme-punch", memeEnabled: false })).not.toContain("overlay");
   });
+  it("renders monochrome and flash meme-library effects only in their selected ranges", () => {
+    expect(videoFilterForSegment({ start: 10, end: 20, effect: "meme-monochrome", memeEnabled: true, memeStart: 12, memeEnd: 13.2 }))
+      .toContain("hue=s=0:enable='between(t,2.000,3.200)'");
+    expect(videoFilterForSegment({ start: 10, end: 20, effect: "meme-flash", memeEnabled: true, memeStart: 14, memeEnd: 15 }))
+      .toContain("eq=brightness=0.16");
+  });
   it("writes concat entries with portable forward slashes", () => {
     expect(concatFileEntry("C:\\Grayfox\\segment-001.mp4")).toBe("file 'C:/Grayfox/segment-001.mp4'");
   });
 
-  it("preserves only approved meme punch effects", () => {
+  it("preserves supported meme-library effects and rejects unknown ones", () => {
     expect(cleanSegments([
       { start: 1, end: 4, role: "body", effect: "meme-punch", memeStart: 2, memeEnd: 3.2 },
-      { start: 5, end: 8, role: "body", effect: "unknown" },
+      { start: 5, end: 8, role: "body", effect: "meme-monochrome", memeStart: 6, memeEnd: 7.2 },
+      { start: 8, end: 9, role: "body", effect: "unknown" },
     ], 10)).toEqual([
       { start: 1, end: 4, role: "body", effect: "meme-punch", memeEnabled: true, memeStart: 2, memeEnd: 3.2 },
-      { start: 5, end: 8, role: "body" },
+      { start: 5, end: 8, role: "body", effect: "meme-monochrome", memeEnabled: true, memeStart: 6, memeEnd: 7.2 },
+      { start: 8, end: 9, role: "body" },
     ]);
   });
 });

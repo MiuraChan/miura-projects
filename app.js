@@ -77,6 +77,7 @@ function createGrayfoxApp(doc, win) {
     editPlanSummary: doc.querySelector("#edit-plan-summary"),
     memeEditor: doc.querySelector("#meme-editor"),
     memeBeatList: doc.querySelector("#meme-beat-list"),
+    memeLibrary: doc.querySelector("#meme-library"),
     memeEditorCount: doc.querySelector("#meme-editor-count"),
     applyMemeEdits: doc.querySelector("#apply-meme-edits"),
     replaceVideo: doc.querySelector("#replace-video"),
@@ -501,7 +502,7 @@ function createGrayfoxApp(doc, win) {
       state.firstCut = {
         ...project.editReview,
         editPlan: { segments, outputDuration: Number(project.editReview.duration) || 0 },
-        analysis: { memeBeatCount: segments.filter((segment) => segment.effect === "meme-punch" && segment.memeEnabled !== false).length },
+        analysis: { memeBeatCount: segments.filter((segment) => Object.values(memePresets).some((preset) => preset.effect === segment.effect) && segment.memeEnabled !== false).length },
       };
       state.memeEditsDirty = false;
       if (desktop?.restoreVideo) {
@@ -821,32 +822,80 @@ function createGrayfoxApp(doc, win) {
       : "");
   }
 
+  const memePresets = Object.freeze({
+    punch: { effect: "meme-punch", label: "Punch zoom", reason: "User-selected punch zoom" },
+    monochrome: { effect: "meme-monochrome", label: "Monochrome sting", reason: "User-selected monochrome sting" },
+    flash: { effect: "meme-flash", label: "Impact flash", reason: "User-selected impact flash" },
+  });
+
+  function memeEffectLabel(effect) {
+    return Object.values(memePresets).find((preset) => preset.effect === effect)?.label || "Meme effect";
+  }
+
   function memeSegments(editPlan = state.firstCut?.editPlan) {
     return (editPlan?.segments || []).map((segment, index) => ({ segment, index }))
-      .filter(({ segment }) => segment.effect === "meme-punch");
+      .filter(({ segment }) => Object.values(memePresets).some((preset) => preset.effect === segment.effect));
+  }
+
+  function sourceTimeAtPlayhead() {
+    const playhead = Math.max(0, Number(elements.preview?.currentTime) || 0);
+    if (state.previewRepresentsSource) return playhead;
+    let outputCursor = 0;
+    for (const segment of state.firstCut?.editPlan?.segments || []) {
+      const length = Math.max(0, Number(segment.end) - Number(segment.start));
+      if (playhead <= outputCursor + length) return Number(segment.start) + Math.max(0, playhead - outputCursor);
+      outputCursor += length;
+    }
+    return Number(state.firstCut?.editPlan?.segments?.at(-1)?.start) || 0;
   }
 
   function renderMemeEditor() {
     if (!elements.memeEditor || !elements.memeBeatList) return;
+    const hasCut = Boolean(state.firstCut?.editPlan?.segments?.length);
     const beats = memeSegments();
-    elements.memeEditor.hidden = !beats.length;
+    elements.memeEditor.hidden = !hasCut;
     const activeCount = beats.filter(({ segment }) => segment.memeEnabled !== false).length;
-    elements.memeEditorCount.textContent = `${activeCount} active · ${beats.length} suggested`;
+    elements.memeEditorCount.textContent = `${activeCount} inserted`;
     elements.applyMemeEdits.disabled = !state.memeEditsDirty;
-    elements.memeBeatList.innerHTML = beats.map(({ segment, index }, beatIndex) => {
+    elements.memeBeatList.innerHTML = beats.length ? beats.map(({ segment, index }, beatIndex) => {
       const enabled = segment.memeEnabled !== false;
       const time = Number.isFinite(Number(segment.memeStart)) ? Number(segment.memeStart) : Number(segment.start);
       return `<article class="meme-beat${enabled ? "" : " disabled"}" data-meme-segment="${index}">
         <span class="meme-beat-signal" aria-hidden="true"></span>
-        <div class="meme-beat-copy"><strong>Meme beat ${beatIndex + 1}</strong><span class="meme-beat-time">At <input type="number" step="0.5" min="${Number(segment.start).toFixed(1)}" max="${Math.max(segment.start, segment.end - 0.2).toFixed(1)}" value="${time.toFixed(1)}" data-meme-time aria-label="Meme beat ${beatIndex + 1} source time in seconds"> sec</span></div>
+        <div class="meme-beat-copy"><strong>${escapeHtml(memeEffectLabel(segment.effect))}${segment.memeSuggested ? " · AI suggestion" : ""}</strong><span class="meme-beat-time">At <input type="number" step="0.5" min="${Number(segment.start).toFixed(1)}" max="${Math.max(segment.start, segment.end - 0.2).toFixed(1)}" value="${time.toFixed(1)}" data-meme-time aria-label="Meme effect ${beatIndex + 1} source time in seconds"> sec</span></div>
         <div class="meme-beat-actions"><button type="button" data-meme-action="earlier" title="Move 1 second earlier">−1</button><button type="button" data-meme-action="later" title="Move 1 second later">+1</button><button type="button" data-meme-action="toggle">${enabled ? "Remove" : "Restore"}</button></div>
       </article>`;
-    }).join("");
+    }).join("") : `<p class="meme-library-empty">No meme effects inserted. Play the cut, pause on a beat and choose one above.</p>`;
   }
 
+  function addMemePreset(presetId) {
+    const preset = memePresets[presetId];
+    const segments = state.firstCut?.editPlan?.segments || [];
+    if (!preset || !segments.length) {
+      showToast("Create the first cut before inserting meme effects.");
+      return false;
+    }
+    const sourceTime = sourceTimeAtPlayhead();
+    const segment = segments.find((item) => sourceTime >= Number(item.start) && sourceTime < Number(item.end))
+      || segments.find((item) => Number(item.end) - Number(item.start) >= 0.5);
+    if (!segment) return false;
+    segment.effect = preset.effect;
+    segment.memeEnabled = true;
+    segment.memeSuggested = false;
+    segment.memeStart = Number(Math.min(Math.max(sourceTime, Number(segment.start)), Math.max(Number(segment.start), Number(segment.end) - 0.2)).toFixed(3));
+    segment.memeEnd = Number(Math.min(Number(segment.end), segment.memeStart + 1.2).toFixed(3));
+    segment.memeReason = preset.reason;
+    state.memeEditsDirty = true;
+    state.firstCut.approval = "pending";
+    renderMemeEditor();
+    updateReviewPanel();
+    elements.reviewStatus.textContent = "Meme changes not rendered";
+    showToast(`${preset.label} inserted at ${formatClipTime(segment.memeStart)}. Render changes to review it.`);
+    return true;
+  }
   function updateMemeBeat(segmentIndex, { delta = 0, time = null, toggle = false } = {}) {
     const segment = state.firstCut?.editPlan?.segments?.[Number(segmentIndex)];
-    if (!segment || segment.effect !== "meme-punch") return false;
+    if (!segment || !Object.values(memePresets).some((preset) => preset.effect === segment.effect)) return false;
     if (toggle) segment.memeEnabled = segment.memeEnabled === false;
     if (delta || time != null) {
       const current = Number.isFinite(Number(segment.memeStart)) ? Number(segment.memeStart) : Number(segment.start);
@@ -904,7 +953,10 @@ function createGrayfoxApp(doc, win) {
       return null;
     }
   }
-  elements.memeBeatList?.addEventListener("click", (event) => {
+  elements.memeLibrary?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-meme-preset]");
+    if (button) addMemePreset(button.dataset.memePreset);
+  });  elements.memeBeatList?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-meme-action]");
     const card = button?.closest("[data-meme-segment]");
     if (!button || !card) return;
@@ -1305,7 +1357,7 @@ function createGrayfoxApp(doc, win) {
       clipData.splice(0, clipData.length, ...candidates);
       renderClipCandidates(clipData);
       saveProject(`${clipData.length} ranked clip candidates`);
-      const engine = state.analysis?.provider === "ollama-vision" ? "local vision AI" : "measured local signals";
+      const engine = /vision|lm-studio/.test(state.analysis?.provider || "") ? "local vision AI" : "measured local signals";
       showToast(`${clipData.length} moments ranked with ${engine}.`);
       return clipData;
     } catch (error) {
@@ -1457,6 +1509,7 @@ function createGrayfoxApp(doc, win) {
     captureProjectThumbnail,
     memeSegments,
     renderMemeEditor,
+    addMemePreset,
     updateMemeBeat,
     applyMemeChanges,
   };

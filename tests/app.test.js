@@ -991,7 +991,7 @@ describe("Editable meme beats", () => {
     app.updateReviewPanel();
 
     expect(document.querySelector("#meme-editor").hidden).toBe(false);
-    expect(document.querySelector("#meme-editor-count").textContent).toContain("1 active");
+    expect(document.querySelector("#meme-editor-count").textContent).toContain("1 inserted");
     document.querySelector('[data-meme-action="later"]').click();
     expect(app.state.firstCut.editPlan.segments[0].memeStart).toBe(13);
     expect(await app.approveFirstCut()).toBe(false);
@@ -1006,6 +1006,29 @@ describe("Editable meme beats", () => {
     expect(await app.approveFirstCut()).toBe(true);
   });
 
+  it("offers a clear meme collection and inserts the selected template at the playhead", () => {
+    const { document, app } = setup();
+    app.state.firstCut = {
+      outputPath: "cut.mp4",
+      duration: 20,
+      approval: "pending",
+      editPlan: { segments: [{ start: 10, end: 20, role: "hook" }, { start: 30, end: 40, role: "body" }] },
+      analysis: { memeBeatCount: 0 },
+    };
+    Object.defineProperty(document.querySelector("#video-preview"), "currentTime", { configurable: true, value: 3 });
+    app.renderMemeEditor();
+
+    expect(document.querySelectorAll("[data-meme-preset]")).toHaveLength(3);
+    expect(app.addMemePreset("monochrome")).toBe(true);
+    expect(app.state.firstCut.editPlan.segments[0]).toEqual(expect.objectContaining({
+      effect: "meme-monochrome",
+      memeEnabled: true,
+      memeStart: 13,
+      memeSuggested: false,
+    }));
+    expect(document.querySelector("#meme-beat-list").textContent).toContain("Monochrome sting");
+    expect(app.state.memeEditsDirty).toBe(true);
+  });
   it("can remove and restore a suggested meme without deleting its position", () => {
     const { document, app } = setup();
     app.state.firstCut = {

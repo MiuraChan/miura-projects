@@ -7,6 +7,8 @@ const {
   parseSilences,
   parseSubtitleCues,
   requestOllamaVision,
+  requestLmStudioVision,
+  buildDirectionAuditWindows,
   extractDirectionRules,
   buildTimelineWindows,
   mergeExcludedTimelineRanges,
@@ -93,6 +95,20 @@ describe("Grayfox local AI signals", () => {
   });
 });
 
+it("uses the installed LM Studio vision model with structured multimodal output", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      choices: [{ message: { content: JSON.stringify({ rankings: [{ index: 0, semanticScore: 96, memeScore: 32, title: "Nested player", rationale: "Creator watches an earlier video.", memeReason: "No meme requested." }] }) } }],
+    }),
+  }));
+  const result = await requestLmStudioVision([{ start: 0, end: 15 }], ["ZmFrZQ=="], "remove the first part where I watch the previous video");
+  expect(result.provider).toBe("lm-studio-qwen3-vl");
+  expect(result.model).toBe("qwen/qwen3-vl-4b");
+  const request = JSON.parse(fetch.mock.calls[0][1].body);
+  expect(request.response_format.type).toBe("json_schema");
+  expect(request.messages[0].content[1].image_url.url).toMatch(/^data:image\/jpeg;base64,/);
+});
 describe("Grayfox direction compliance", () => {
   it("normalizes fractional model scores and deterministically enforces visible removal rules", () => {
     expect(normalizeVisionScore(0.91)).toBe(91);
@@ -126,6 +142,15 @@ describe("Grayfox direction compliance", () => {
     expect(windows.at(-1).end).toBeCloseTo(4977.64, 2);
   });
 
+  it("samples opening-removal instructions more closely before returning to the regular audit", () => {
+    const windows = buildDirectionAuditWindows(1800, { mustRemove: ["rimuovi prima parte in cui guardo il video precedente"] });
+    expect(windows.slice(0, 3)).toEqual([
+      { start: 0, end: 20, sampleAt: 10 },
+      { start: 20, end: 40, sampleAt: 30 },
+      { start: 40, end: 60, sampleAt: 50 },
+    ]);
+    expect(windows.some((window) => window.start >= 720)).toBe(true);
+  });
   it("merges consecutive high-confidence removal windows", () => {
     const ranges = mergeExcludedTimelineRanges([
       { start: 540, end: 600, decision: "remove", confidence: 92, reason: "nested old episode", enforcedBy: "visible-rewatch-rule" },
@@ -133,8 +158,9 @@ describe("Grayfox direction compliance", () => {
       { start: 660, end: 720, decision: "neutral", confidence: 80, reason: "creator talking" },
       { start: 780, end: 840, decision: "remove", confidence: 90, reason: "same replay after a sparse sampling gap", enforcedBy: "visible-rewatch-rule" },
     ]);
-    expect(ranges).toHaveLength(1);
-    expect(ranges[0]).toEqual(expect.objectContaining({ start: 540, end: 840 }));
+    expect(ranges).toHaveLength(2);
+    expect(ranges[0]).toEqual(expect.objectContaining({ start: 540, end: 660 }));
+    expect(ranges[1]).toEqual(expect.objectContaining({ start: 780, end: 840 }));
   });
 
   it("adds no more than three grounded meme punches to selected moments", () => {

@@ -43,8 +43,8 @@ async function main() {
       direction: "Choose the clearest visual hook and evaluate text-overlay potential.",
     });
 
-    if (analysis.provider !== "ollama-vision" || analysis.model !== "qwen3-vl:2b-instruct") {
-      throw new Error(`Expected Ollama vision analysis, received ${analysis.provider}: ${analysis.fallbackReason || "unknown reason"}`);
+    if (analysis.provider !== "lm-studio-qwen3-vl" || analysis.model !== "qwen/qwen3-vl-4b") {
+      throw new Error(`Expected LM Studio Qwen3-VL analysis, received ${analysis.provider}: ${analysis.fallbackReason || "unknown reason"}`);
     }
     if (analysis.candidates.length !== 3) throw new Error("Expected three ranked candidates.");
     for (const candidate of analysis.candidates) {

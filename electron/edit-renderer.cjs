@@ -20,7 +20,7 @@ function cleanSegments(rawSegments, fullDuration) {
   return rawSegments.slice(0, 64).map((segment) => {
     const start = Math.min(Math.max(0, Number(segment?.start) || 0), fullDuration - 0.05);
     const end = Math.min(Math.max(Number(segment?.end) || 0, start + 0.05), fullDuration);
-    const effect = segment?.effect === "meme-punch" ? "meme-punch" : null;
+    const effect = ["meme-punch", "meme-monochrome", "meme-flash"].includes(segment?.effect) ? segment.effect : null;
     const memeEnabled = effect ? segment?.memeEnabled !== false : false;
     const memeStart = Math.min(Math.max(Number(segment?.memeStart) || start, start), end);
     const memeEnd = Math.min(Math.max(Number(segment?.memeEnd) || memeStart + 1.2, memeStart + 0.1), end);
@@ -30,10 +30,13 @@ function cleanSegments(rawSegments, fullDuration) {
 
 function videoFilterForSegment(segment) {
   const base = "scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1";
-  if (segment.effect !== "meme-punch" || segment.memeEnabled === false) return base;
+  if (!segment.effect || segment.memeEnabled === false) return base;
   const localStart = Math.max(0, Number(segment.memeStart) - Number(segment.start));
   const localEnd = Math.max(localStart + 0.1, Number(segment.memeEnd) - Number(segment.start));
-  return `${base},split[base][zoom];[zoom]scale=trunc(iw*1.08/2)*2:trunc(ih*1.08/2)*2,crop=trunc(iw/1.08/2)*2:trunc(ih/1.08/2)*2:(iw-ow)/2:(ih-oh)/2[zoomed];[base][zoomed]overlay=0:0:enable='between(t,${localStart.toFixed(3)},${localEnd.toFixed(3)})'`;
+  const enabled = `between(t,${localStart.toFixed(3)},${localEnd.toFixed(3)})`;
+  if (segment.effect === "meme-monochrome") return `${base},hue=s=0:enable='${enabled}'`;
+  if (segment.effect === "meme-flash") return `${base},eq=brightness=0.16:saturation=1.15:enable='${enabled}'`;
+  return `${base},split[base][zoom];[zoom]scale=trunc(iw*1.08/2)*2:trunc(ih*1.08/2)*2,crop=trunc(iw/1.08/2)*2:trunc(ih/1.08/2)*2:(iw-ow)/2:(ih-oh)/2[zoomed];[base][zoomed]overlay=0:0:enable='${enabled}'`;
 }
 function formatTimestamp(rawSeconds) {
   const seconds = Math.max(0, Math.floor(Number(rawSeconds) || 0));

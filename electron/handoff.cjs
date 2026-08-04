@@ -12,6 +12,13 @@ function safeName(value) {
   return String(value || "Grayfox edit").trim().slice(0, 80).replace(/[<>:"/\\|?*\x00-\x1F]/g, "-").replace(/[. ]+$/g, "") || "Grayfox edit";
 }
 
+function memeEffectName(effect) {
+  return ({
+    "meme-punch": "Meme Punch",
+    "meme-monochrome": "Meme Monochrome Sting",
+    "meme-flash": "Meme Impact Flash",
+  })[effect] || "Meme Effect";
+}
 function normalizedSegments(payload) {
   const sourceSegments = Array.isArray(payload?.segments) && payload.segments.length
     ? payload.segments
@@ -20,8 +27,8 @@ function normalizedSegments(payload) {
     start: Math.max(0, Number(segment.start) || 0),
     end: Math.max(Number(segment.end) || 0, Number(segment.start) || 0),
     role: String(segment.role || "body"),
-    effect: segment.effect === "meme-punch" ? "meme-punch" : null,
-    memeEnabled: segment.effect === "meme-punch" && segment.memeEnabled !== false,
+    effect: ["meme-punch", "meme-monochrome", "meme-flash"].includes(segment.effect) ? segment.effect : null,
+    memeEnabled: ["meme-punch", "meme-monochrome", "meme-flash"].includes(segment.effect) && segment.memeEnabled !== false,
     memeStart: Number(segment.memeStart),
     memeEnd: Number(segment.memeEnd),
     memeReason: String(segment.memeReason || ""),
@@ -43,7 +50,7 @@ function premiereXml({ sourcePath, projectName, segments, fps = 30 }) {
     const sourceTrack = mediaType === "audio" ? "<sourcetrack><mediatype>audio</mediatype><trackindex>1</trackindex></sourcetrack>" : "";
     const file = prefix === "v" && index === 0 ? fullFile : '<file id="source-1"/>';
     const marker = prefix === "v" && entry.segment.memeEnabled && Number.isFinite(entry.segment.memeStart)
-      ? `<marker><name>Grayfox Meme Punch</name><comment>${escapeXml(entry.segment.memeReason || "AI suggested meme beat")}</comment><in>${Math.round(entry.segment.memeStart * fps)}</in><out>${Math.round((Number(entry.segment.memeEnd) || entry.segment.memeStart + 1.2) * fps)}</out></marker>`
+      ? `<marker><name>Grayfox ${escapeXml(memeEffectName(entry.segment.effect))}</name><comment>${escapeXml(entry.segment.memeReason || "AI suggested meme beat")}</comment><in>${Math.round(entry.segment.memeStart * fps)}</in><out>${Math.round((Number(entry.segment.memeEnd) || entry.segment.memeStart + 1.2) * fps)}</out></marker>`
       : "";
     return `<clipitem id="${prefix}-clip-${index + 1}"><name>${escapeXml(`${projectName} ${entry.segment.role}`)}</name><start>${entry.startFrame}</start><end>${entry.endFrame}</end><in>${entry.inFrame}</in><out>${entry.inFrame + entry.durationFrames}</out>${file}${sourceTrack}${marker}</clipitem>`;
   }).join("");
@@ -63,8 +70,12 @@ function afterEffectsScript({ sourcePath, projectName, segments, fps = 30 }) {
     const start = items.slice(0, index).reduce((total, item) => total + item.end - item.start, 0);
     const memeStart = start + (Number(segment.memeStart) - segment.start);
     const memeEnd = start + (Number(segment.memeEnd) - segment.start);
+    const effectLabel = memeEffectName(segment.effect);
+    const scaleKeys = segment.effect === "meme-punch"
+      ? ` var scale${index} = layer${index}.property("Transform").property("Scale"); scale${index}.setValueAtTime(${Math.max(start, memeStart - 0.08).toFixed(3)}, [100,100]); scale${index}.setValueAtTime(${memeStart.toFixed(3)}, [108,108]); scale${index}.setValueAtTime(${memeEnd.toFixed(3)}, [108,108]); scale${index}.setValueAtTime(${Math.min(start + length, memeEnd + 0.08).toFixed(3)}, [100,100]);`
+      : "";
     const memeKeys = segment.memeEnabled && Number.isFinite(memeStart) && Number.isFinite(memeEnd)
-      ? ` var scale${index} = layer${index}.property("Transform").property("Scale"); scale${index}.setValueAtTime(${Math.max(start, memeStart - 0.08).toFixed(3)}, [100,100]); scale${index}.setValueAtTime(${memeStart.toFixed(3)}, [108,108]); scale${index}.setValueAtTime(${memeEnd.toFixed(3)}, [108,108]); scale${index}.setValueAtTime(${Math.min(start + length, memeEnd + 0.08).toFixed(3)}, [100,100]); var marker${index} = new MarkerValue("Grayfox Meme Punch"); layer${index}.property("Marker").setValueAtTime(${memeStart.toFixed(3)}, marker${index});`
+      ? `${scaleKeys} var marker${index} = new MarkerValue("Grayfox ${effectLabel}"); layer${index}.property("Marker").setValueAtTime(${memeStart.toFixed(3)}, marker${index});`
       : "";
     layerLines.push(`var layer${index} = comp.layers.add(footage); layer${index}.startTime = ${start.toFixed(3)} - ${segment.start.toFixed(3)}; layer${index}.inPoint = ${start.toFixed(3)}; layer${index}.outPoint = ${(start + length).toFixed(3)}; layer${index}.name = "Cut ${index + 1} - ${String(segment.role).replace(/"/g, "")}";${memeKeys}`);
     cursor += length;

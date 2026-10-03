@@ -160,6 +160,15 @@ test("lists briefing history by kind while excluding dismissed entries by defaul
     ["debrief-kept"],
   );
 });
+
+test("deletes only the replaceable briefing kind", async (t) => {
+  const { db } = await temporaryDatabase(t);
+  db.createBriefing({ id: "intel-old", kind: "daily-intel", title: "Intel", body: "Old" });
+  db.createBriefing({ id: "debrief-kept", kind: "call-debrief", title: "Debrief", body: "Keep" });
+  assert.equal(db.deleteBriefingsByKind("daily-intel"), 1);
+  assert.deepEqual(db.listBriefings({ kind: "daily-intel", includeDismissed: true }), []);
+  assert.equal(db.getBriefing("debrief-kept")?.id, "debrief-kept");
+});
 test("upserts sources and ranks trusted relevant intel first", async (t) => {
   const now = Date.parse("2026-07-29T12:00:00.000Z");
   const { db } = await temporaryDatabase(t, {

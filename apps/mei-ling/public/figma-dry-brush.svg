@@ -1,0 +1,15 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="340" height="360" viewBox="0 0 340 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Dry brush frame" clip-path="url(#clip0_0_7)">
+<path id="Vector" opacity="0.85" d="M0 0H340V24L300 18L272 31L219 20L178 32L128 22L74 36L0 25V0Z" fill="#050907"/>
+<path id="Vector_2" opacity="0.88" d="M0 332L48 340L91 328L138 346L194 330L250 341L340 326V360H0V332Z" fill="#050907"/>
+<g id="Vector_3" opacity="0.6">
+<path d="M4 8L48 2ZM286 6L336 17ZM5 344L72 352ZM272 348L337 334Z" fill="black"/>
+<path d="M4 8L48 2M286 6L336 17M5 344L72 352M272 348L337 334" stroke="#BEECC1" stroke-width="3"/>
+</g>
+</g>
+<defs>
+<clipPath id="clip0_0_7">
+<rect width="340" height="360" fill="white"/>
+</clipPath>
+</defs>
+</svg>

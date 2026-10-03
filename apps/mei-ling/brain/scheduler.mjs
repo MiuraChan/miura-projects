@@ -6,6 +6,7 @@ import {
   getEnabledSources,
 } from "./source-catalog.mjs";
 import { fetchFeed, scoreItemRelevance } from "./rss.mjs";
+import { isGamingEditorialResult } from "./live-search.mjs";
 
 const HOUR_MS = 60 * 60 * 1_000;
 const SCOUT_INTERVAL_MS = 4 * HOUR_MS;
@@ -81,6 +82,16 @@ function publicBriefing(briefing) {
     spokenSummary: metadata.spokenSummary || briefing.body,
     creatorAngle: metadata.creatorAngle || "",
     recordingMission: metadata.recordingMission || "",
+    contentType: metadata.contentType || "news",
+    sourceAssessment: metadata.sourceAssessment || "",
+    sourceTier: metadata.sourceTier || "unknown",
+    claimStatus: metadata.claimStatus || "reported",
+    confidenceScore: Number(metadata.confidenceScore ?? 0),
+    channelFitScore: Number(metadata.channelFitScore ?? 0),
+    timelinessScore: Number(metadata.timelinessScore ?? 0),
+    opportunityScore: Number(metadata.opportunityScore ?? 0),
+    whyItMatters: metadata.whyItMatters || "",
+    recommendation: metadata.recommendation || "monitor",
     evidence: Array.isArray(metadata.evidence) ? metadata.evidence : [],
     createdAt: briefing.created_at,
     readAt: briefing.read_at,
@@ -97,12 +108,17 @@ export function createBrainScheduler({
   fetchFeedFn = fetchFeed,
   sourceProvider = getEnabledSources,
   initialDelayMs = 15_000,
+  setTimeoutFn = setTimeout,
+  clearTimeoutFn = clearTimeout,
+  setIntervalFn = setInterval,
+  clearIntervalFn = clearInterval,
 }) {
   if (!db) throw new TypeError("A brain database is required");
   if (typeof complete !== "function") throw new TypeError("A completion function is required");
 
   const workerId = `codec-${process.pid}-${randomUUID().slice(0, 8)}`;
   let timer = null;
+  let startupTimer = null;
   let tickPromise = null;
   let scanPromise = null;
 
@@ -197,6 +213,11 @@ export function createBrainScheduler({
       let relevant = 0;
       const items = result.feed.items.slice(0, 40);
       for (const item of items) {
+        if (source.publisherType !== "official" && !isGamingEditorialResult({
+          title: item.title,
+          source: source.name,
+          summary: item.summary,
+        })) continue;
         const relevance = scoreItemRelevance(item, MIURA_RELEVANCE_PROFILE);
         if (!relevance.relevant) continue;
         relevant += 1;
@@ -296,6 +317,9 @@ export function createBrainScheduler({
       id: briefing.id,
       title: briefing.title,
       spokenSummary: briefing.metadata?.spokenSummary || briefing.body,
+      claimStatus: briefing.metadata?.claimStatus || "reported",
+      confidenceScore: Number(briefing.metadata?.confidenceScore ?? 0),
+      recommendation: briefing.metadata?.recommendation || "monitor",
     });
     if (!delivered) {
       db.setSetting("pendingNotificationBriefingId", briefing.id);
@@ -330,28 +354,43 @@ export function createBrainScheduler({
       .map((outcome) => String(outcome.reason?.message || outcome.reason).slice(0, 300));
     const day = localDateKey(started, timeZone);
     const intel = eligibleIntel(started);
-    const signature = intel.map((item) => item.id).join("|");
-    const duplicate =
-      db.getSetting("lastBriefingDate") === day &&
-      db.getSetting("lastBriefingSignature") === signature;
+    const signature = intel.length
+      ? intel.map((item) => item.id).join("|")
+      : `evergreen:${day}`;
+    const duplicate = !force && db.getSetting("lastBriefingDate") === day;
 
     let briefing = null;
-    if (intel.length && (!duplicate || force && !db.listUnreadBriefings({ limit: 1 }).length)) {
+    if (!duplicate) {
       const generated = await buildEvidenceBackedBriefing({
         items: intel,
         complete,
         now: started,
       });
+      const evaluation = {
+        contentType: generated.contentType,
+        sourceAssessment: generated.sourceAssessment,
+        sourceTier: generated.sourceTier,
+        claimStatus: generated.claimStatus,
+        confidenceScore: generated.confidenceScore,
+        channelFitScore: generated.channelFitScore,
+        timelinessScore: generated.timelinessScore,
+        opportunityScore: generated.opportunityScore,
+        whyItMatters: generated.whyItMatters,
+        recommendation: generated.recommendation,
+      };
+      db.deleteBriefingsByKind("daily-intel");
       briefing = db.createBriefing({
         kind: "daily-intel",
         title: generated.headline,
         body: JSON.stringify({
+          ...evaluation,
           creatorAngle: generated.creatorAngle,
           recordingMission: generated.recordingMission,
           evidence: generated.evidence,
         }),
         itemIds: generated.sourceIds,
         metadata: {
+          ...evaluation,
           spokenSummary: generated.spokenSummary,
           creatorAngle: generated.creatorAngle,
           recordingMission: generated.recordingMission,
@@ -379,6 +418,7 @@ export function createBrainScheduler({
       fetchedItems: fulfilled.reduce((sum, item) => sum + item.fetched, 0),
       relevantItems: fulfilled.reduce((sum, item) => sum + item.relevant, 0),
       briefing: publicBriefing(briefing),
+      forced: force,
       duplicate,
       errors: failures.slice(0, 5),
     };
@@ -433,15 +473,21 @@ export function createBrainScheduler({
   }
 
   function start() {
-    if (timer) return;
+    if (timer || startupTimer) return;
     initialize();
-    timer = setInterval(guardedTick, 30_000);
-    timer.unref?.();
-    setTimeout(guardedTick, Math.min(initialDelayMs, 30_000)).unref?.();
+    startupTimer = setTimeoutFn(() => {
+      startupTimer = null;
+      void guardedTick();
+      timer = setIntervalFn(guardedTick, 30_000);
+      timer.unref?.();
+    }, initialDelayMs);
+    startupTimer.unref?.();
   }
 
   function stop() {
-    if (timer) clearInterval(timer);
+    if (startupTimer) clearTimeoutFn(startupTimer);
+    if (timer) clearIntervalFn(timer);
+    startupTimer = null;
     timer = null;
   }
 
@@ -449,7 +495,9 @@ export function createBrainScheduler({
     const job = db.getJob(SCOUT_JOB_ID);
     return {
       internetAccess: "public-read-only",
-      scheduler: timer ? "running" : "stopped",
+      scheduler: timer || startupTimer ? "running" : "stopped",
+      schedulerPhase: startupTimer ? "waiting" : timer ? "polling" : "stopped",
+      backgroundStartDelayMs: initialDelayMs,
       intervalHours: intervalMs / HOUR_MS,
       quietHours: "22:00–08:00 Europe/Rome",
       nextScanAt: job?.next_run_at || null,

@@ -1,0 +1,12 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="1440" height="900" viewBox="0 0 1440 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Ink Wash / Background" clip-path="url(#clip0_0_14)">
+<path id="Vector" opacity="0.055" d="M-40 110C180 45 330 115 520 72C760 18 950 100 1490 22V126C1040 96 790 142 536 120C320 102 122 178 -40 150V110Z" fill="#B9E9B4"/>
+<path id="Vector_2" opacity="0.075" d="M1030 -20C960 160 1115 210 1040 410C980 590 1120 720 990 940H1185C1280 700 1170 560 1250 380C1320 210 1240 90 1375 -20H1030Z" fill="#5CED91"/>
+<path id="Vector_3" opacity="0.045" d="M-80 720C230 655 430 805 700 720C960 640 1160 705 1510 620V760C1180 720 950 820 710 780C420 735 240 845 -80 805V720Z" fill="#DCE9DD"/>
+</g>
+<defs>
+<clipPath id="clip0_0_14">
+<rect width="1440" height="900" fill="white"/>
+</clipPath>
+</defs>
+</svg>

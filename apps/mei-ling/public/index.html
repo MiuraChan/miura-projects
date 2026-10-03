@@ -4,26 +4,30 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#000000" />
-  <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="stylesheet" href="/styles.css" />
-  <link rel="stylesheet" href="/effects.css" />
-  <link rel="stylesheet" href="/figma-portrait-motion.css" />
-  <link rel="stylesheet" href="/expression-system.css" />
-  <link rel="stylesheet" href="/conversation.css" />
-  <link rel="stylesheet" href="/panels.css" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./effects.css" />
+  <link rel="stylesheet" href="./figma-portrait-motion.css" />
+  <link rel="stylesheet" href="./expression-system.css" />
+  <link rel="stylesheet" href="./conversation.css" />
+  <link rel="stylesheet" href="./panels.css" />
   <title>CODEC // MEI LING</title>
 </head>
 <body>
   <main class="codec-stage" aria-label="MGS1 Codec">
+    <p id="publicDemoNotice" class="codec-demo-notice" hidden>
+      PUBLIC DEMO // VOICE + TEXT + DAILY INTEL // NO PRIVATE MEMORY
+    </p>
     <section
       class="codec"
       data-state="idle"
+      data-portraits="none"
       tabindex="0"
       role="button"
       aria-label="Chiama Mei Ling"
     >
-      <figure class="portrait portrait--mei" data-node-id="12:111" data-expression="neutral">
-        <img id="meiPortraitImage" class="portrait__image" src="/figma-mei-manga-approved.png" alt="Mei Ling" />
+      <figure class="portrait portrait--mei" data-node-id="12:111" data-expression="neutral" hidden aria-hidden="true">
+        <img id="meiPortraitImage" class="portrait__image" src="./figma-mei-manga-approved.png" alt="Mei Ling" />
         <span class="phosphor"></span>
         <span class="scanlines"></span>
       </figure>
@@ -41,12 +45,26 @@
         <span class="scanlines"></span>
       </section>
 
-      <figure class="portrait portrait--miura" data-node-id="12:119">
-        <img class="portrait__image" src="/figma-miura-manga-approved.png" alt="Miura" />
+      <figure class="portrait portrait--miura" data-node-id="12:119" hidden aria-hidden="true">
+        <img class="portrait__image" src="./figma-miura-manga-approved.png" alt="Miura" />
         <span class="phosphor"></span>
         <span class="scanlines"></span>
       </figure>
     </section>
+
+    <button
+      id="wakeToggle"
+      class="codec-wake-toggle"
+      type="button"
+      aria-pressed="false"
+      aria-describedby="wakePhraseHint"
+    >
+      <span class="codec-wake-toggle__light" aria-hidden="true"></span>
+      <span id="wakeToggleLabel">WAKE TAP</span>
+    </button>
+    <p id="wakePhraseHint" class="sr-only">
+      Pronuncia: Hey Mei Ling, ci sei?
+    </p>
 
     <button
       id="codecPanelHandle"
@@ -57,6 +75,7 @@
       aria-label="Apri le informazioni di Mei Ling"
     >
       <span aria-hidden="true">◀</span>
+      <span class="codec-panel-handle__label" aria-hidden="true">DATA</span>
       <span class="sr-only">Apri pannelli</span>
     </button>
 
@@ -111,12 +130,24 @@
 
     <p id="codecPanelStatus" class="sr-only" aria-live="polite"></p>
 
-    <section id="codecTranscript" class="codec-transcript" aria-live="polite" hidden>
+    <section id="codecTranscript" class="codec-transcript" hidden>
       <header class="codec-transcript__header">
         <span id="transcriptSpeaker">CODEC</span>
-        <span id="callStatus">STANDBY</span>
+        <span class="codec-transcript__controls">
+          <span id="callStatus">STANDBY</span>
+          <button id="codecHangup" class="codec-hangup" type="button" hidden>END</button>
+        </span>
       </header>
-      <p id="transcriptText" class="codec-transcript__text"></p>
+      <ol
+        id="callHistory"
+        class="codec-call-history"
+        role="log"
+        aria-label="Conversazione Codec"
+        aria-live="polite"
+        aria-relevant="additions"
+        hidden
+      ></ol>
+      <p id="transcriptText" class="codec-transcript__text" aria-live="polite"></p>
       <form id="messageForm" class="codec-text-form" hidden>
         <label class="sr-only" for="messageInput">Messaggio per Mei Ling</label>
         <input
@@ -127,10 +158,11 @@
           autocomplete="off"
           placeholder="SCRIVI A MEI LING…"
         />
-        <button type="submit">SEND</button>
+        <button id="messageSubmit" type="submit">SEND</button>
       </form>
     </section>
   </main>
-  <script type="module" src="/app.js?v=6"></script>
+  <script src="./voice-owner.js?v=10"></script>
+  <script type="module" src="./app.js?v=23"></script>
 </body>
 </html>

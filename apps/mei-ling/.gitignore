@@ -21,3 +21,7 @@ public/figma-waveform.svg
 public/audio/codec-connect.wav
 public/audio/codec-incoming.wav
 public/audio/codec-outgoing.wav
+.build/
+dist/
+packaging/runtime/*
+!packaging/runtime/README.md

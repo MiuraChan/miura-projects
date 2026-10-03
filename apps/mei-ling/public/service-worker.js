@@ -1,23 +1,30 @@
-const CACHE = "mei-ling-codec-call-v6";
+const CACHE = "mei-ling-codec-call-v23";
 const ASSETS = [
-  "/",
-  "/styles.css",
-  "/effects.css",
-  "/figma-portrait-motion.css",
-  "/expression-system.css",
-  "/conversation.css",
-  "/panels.css",
-  "/app.js",
-  "/manifest.webmanifest",
-  "/figma-mei-manga-approved.png",
-  "/figma-miura-manga-approved.png",
-  "/mei-expression-laughing-v1.png",
-  "/mei-expression-serious-v1.png",
-  "/mei-expression-embarrassed-v1.png",
-  "/mei-expression-angry-v1.png",
-  "/audio/metal-gear-codec.mp3",
-  "/audio/codec-disconnect.wav"
-];
+  "./",
+  "./styles.css",
+  "./effects.css",
+  "./figma-portrait-motion.css",
+  "./expression-system.css",
+  "./conversation.css",
+  "./panels.css",
+  "./app.js?v=23",
+  "./firebase-ai-client.js?v=23",
+  "./news-result.js",
+  "./runtime-readiness.js",
+  "./turn-detector.js",
+  "./voice-owner.js",
+  "./voice-input.js",
+  "./wake-word.js",
+  "./manifest.webmanifest",
+  "./figma-mei-manga-approved.png",
+  "./figma-miura-manga-approved.png",
+  "./mei-expression-laughing-v1.png",
+  "./mei-expression-serious-v1.png",
+  "./mei-expression-embarrassed-v1.png",
+  "./mei-expression-angry-v1.png",
+  "./audio/metal-gear-codec.mp3",
+  "./audio/codec-disconnect.wav"
+].map((path) => new URL(path, self.registration.scope).href);
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)));

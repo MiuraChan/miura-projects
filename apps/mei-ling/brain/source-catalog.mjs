@@ -255,13 +255,34 @@ const googleNewsQueryDefinitions = [
   },
 ];
 
+const globalGamingDiscoveryDefinitions = [
+  { id: "global-it", language: "it", region: "IT", edition: "IT:it", query: '(videogiochi OR "industria gaming" OR PlayStation OR Xbox OR Nintendo OR Steam) when:7d -scommesse -casino -lotteria' },
+  { id: "global-en-us", language: "en-US", region: "US", edition: "US:en", query: '("video games" OR "games industry" OR PlayStation OR Xbox OR Nintendo OR Steam) when:7d -gambling -betting -casino -lottery' },
+  { id: "global-en-gb", language: "en-GB", region: "GB", edition: "GB:en", query: '("video games" OR "games industry" OR PlayStation OR Xbox OR Nintendo OR Steam) when:7d -gambling -betting -casino -lottery' },
+  { id: "global-ja", language: "ja", region: "JP", edition: "JP:ja", query: '(ゲーム業界 OR ビデオゲーム OR コンピュータゲーム OR ゲームソフト OR ゲーム開発 OR PlayStation OR Xbox OR Nintendo OR Steam) when:7d' },
+  { id: "global-es", language: "es", region: "ES", edition: "ES:es", query: '(videojuegos OR "industria del videojuego" OR PlayStation OR Xbox OR Nintendo OR Steam) when:7d -apuestas -casino -lotería' },
+  { id: "global-fr", language: "fr", region: "FR", edition: "FR:fr", query: '("jeux vidéo" OR "industrie du jeu vidéo" OR PlayStation OR Xbox OR Nintendo OR Steam) when:7d -paris -casino -loterie' },
+  { id: "global-de", language: "de", region: "DE", edition: "DE:de", query: '(Computerspiele OR Videospiele OR Spieleindustrie OR PlayStation OR Xbox OR Nintendo OR Steam) when:7d -Glücksspiel -Wetten -Casino -Lotterie' },
+  { id: "global-pt-br", language: "pt-BR", region: "BR", edition: "BR:pt-419", query: '(videogames OR "indústria de jogos" OR PlayStation OR Xbox OR Nintendo OR Steam) when:7d -apostas -cassino -loteria' },
+];
+
 export const GOOGLE_NEWS_QUERIES = deepFreeze(
-  googleNewsQueryDefinitions.map((source) => ({
+  [
+    ...googleNewsQueryDefinitions.map((source) => ({ ...source, language: "it", region: "IT", edition: "IT:it" })),
+    ...globalGamingDiscoveryDefinitions.map((source) => ({
+      ...source,
+      name: `Google News — gaming globale ${source.id.replace("global-", "").toUpperCase()}`,
+      topics: ["global-gaming"],
+    })),
+  ].map((source) => ({
     ...source,
     kind: "google-news-rss",
     publisherType: "aggregator",
-    url: buildGoogleNewsRssUrl(source.query),
-    language: "it",
+    url: buildGoogleNewsRssUrl(source.query, {
+      language: source.language,
+      region: source.region,
+      edition: source.edition,
+    }),
     enabled: true,
   })),
 );

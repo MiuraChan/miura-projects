@@ -1,0 +1,15 @@
+.git
+.runtime
+.build
+dist
+node_modules
+data
+docs
+references
+desktop
+packaging
+*.log
+.env*
+local_*.py
+test_*.py
+

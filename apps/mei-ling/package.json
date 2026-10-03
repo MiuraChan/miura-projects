@@ -4,13 +4,23 @@
   "private": true,
   "type": "module",
   "description": "A local MGS-inspired creator strategy codec for Miura.",
+  "main": "desktop/main-v12.cjs",
   "scripts": {
     "start": "node --env-file=.env.local start.mjs",
     "dev": "node --watch --env-file=.env.local server.mjs",
-    "check": "node --check start.mjs && node --check server.mjs && node --check brain/scheduler.mjs && node --check public/app.js && node --check public/service-worker.js",
+    "demo:local": "node --env-file=.env.local packaging/start-public-demo.mjs",
+    "desktop:dev": "electron .",
+    "standalone:prepare": "powershell -NoProfile -ExecutionPolicy Bypass -File packaging/prepare-standalone.ps1",
+    "standalone:check": "node packaging/check-runtime.mjs",
+    "desktop:dir": "npm run standalone:check && electron-builder --config electron-builder.config.cjs --win dir",
+    "desktop:installer": "npm run standalone:check && electron-builder --config electron-builder.config.cjs --win nsis",
+    "check": "node --check start.mjs && node --check server.mjs && node --check brain/scheduler.mjs && node --check brain/gemini-client.mjs && node --check public/app.js && node --check public/firebase-ai-client.js && node --check public/news-result.js && node --check public/service-worker.js && node --check desktop/main.cjs && node --check desktop/main-v12.cjs && node --check desktop/external-link.cjs && node --check packaging/check-runtime.mjs && node --check packaging/start-public-demo.mjs",
     "test": "node --test brain/*.test.mjs",
     "verify": "npm run check && npm test",
     "voice": "C:\\tmp\\mei-kokoro-env\\Scripts\\python.exe local_voice.py"
   },
-  "dependencies": {}
+  "devDependencies": {
+    "electron": "43.2.0",
+    "electron-builder": "26.15.3"
+  }
 }

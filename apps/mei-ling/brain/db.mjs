@@ -575,14 +575,14 @@ export class BrainDb {
           .prepare(
             `SELECT * FROM messages
              WHERE conversation_id = ? AND created_at < ?
-             ORDER BY created_at DESC, id DESC LIMIT ?`,
+             ORDER BY created_at DESC, rowid DESC LIMIT ?`,
           )
           .all(conversationId, asIso(before), boundedLimit)
       : this.#db
           .prepare(
             `SELECT * FROM messages
              WHERE conversation_id = ?
-             ORDER BY created_at DESC, id DESC LIMIT ?`,
+             ORDER BY created_at DESC, rowid DESC LIMIT ?`,
           )
           .all(conversationId, boundedLimit);
     return rows.reverse().map(decodeMessage);
@@ -889,6 +889,22 @@ export class BrainDb {
     if (!result.changes) return null;
     this.#audit("briefing.dismissed", "briefing", id);
     return this.getBriefing(id);
+  }
+
+  deleteBriefingsByKind(kind) {
+    const cleanKind = assertNonEmpty(String(kind), "Briefing kind");
+    const ids = this.#db
+      .prepare("SELECT id FROM briefings WHERE kind = ?")
+      .all(cleanKind)
+      .map((row) => row.id);
+    const result = this.#db
+      .prepare("DELETE FROM briefings WHERE kind = ?")
+      .run(cleanKind);
+    this.#audit("briefing.kind_deleted", "briefing", cleanKind, {
+      deleted: result.changes,
+      ids,
+    });
+    return result.changes;
   }
 
   // Jobs and leases ---------------------------------------------------------

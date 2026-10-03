@@ -4,9 +4,11 @@
   right: max(0px, env(safe-area-inset-right));
   z-index: 42;
   display: grid;
+  grid-template-rows: auto auto;
   place-items: center;
-  width: 44px;
-  height: 76px;
+  gap: 5px;
+  width: 54px;
+  height: 104px;
   padding: 0;
   border: 1px solid rgba(154, 223, 196, 0.72);
   border-right: 0;
@@ -17,11 +19,18 @@
   color: var(--phosphor);
   font: 900 16px/1 CodecMono, "Courier New", monospace;
   box-shadow: -4px 0 18px rgba(64, 180, 140, 0.14);
-  cursor: ew-resize;
+  cursor: pointer;
   touch-action: none;
   transform: translateY(-50%);
   transition: opacity 160ms linear, transform 240ms steps(5, end);
   -webkit-tap-highlight-color: transparent;
+}
+
+.codec-panel-handle__label {
+  color: rgba(154, 223, 196, 0.72);
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  writing-mode: vertical-rl;
 }
 
 .codec-panel-handle::after {
@@ -49,7 +58,7 @@
   z-index: 40;
   display: grid;
   grid-template-rows: auto auto 20px minmax(0, 1fr) auto;
-  width: min(520px, calc(100vw - 52px));
+  width: min(440px, 38vw);
   height: 100dvh;
   overflow: hidden;
   border-left: 1px solid rgba(154, 223, 196, 0.72);
@@ -290,6 +299,55 @@ body.codec-panels-open .codec-panel-handle {
   overflow-wrap: anywhere;
 }
 
+.codec-intel-evaluation {
+  border-color: rgba(154, 223, 196, 0.46);
+  background:
+    linear-gradient(135deg, rgba(35, 102, 79, 0.18), transparent 48%),
+    rgba(3, 17, 12, 0.84);
+}
+
+.codec-intel-evaluation[data-content-type="evergreen"] {
+  border-color: rgba(230, 196, 116, 0.54);
+  background:
+    linear-gradient(135deg, rgba(154, 111, 42, 0.2), transparent 48%),
+    rgba(17, 14, 6, 0.84);
+}
+
+.codec-intel-evaluation[data-content-type="evergreen"] .codec-data-block__label,
+.codec-intel-evaluation[data-content-type="evergreen"] .codec-data-block__title {
+  color: rgba(247, 218, 151, 0.94);
+}
+
+.codec-intel-evaluation[data-recommendation="cover"] .codec-data-block__title {
+  color: rgba(224, 255, 244, 1);
+}
+
+.codec-intel-evaluation[data-recommendation="monitor"] .codec-data-block__title {
+  color: rgba(247, 218, 151, 0.94);
+}
+
+.codec-intel-evaluation[data-recommendation="skip"] .codec-data-block__title {
+  color: rgba(245, 157, 147, 0.94);
+}
+
+.codec-intel-evaluation .codec-data-kv {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 10px;
+}
+
+.codec-intel-evaluation .codec-data-kv div {
+  display: block;
+  min-width: 0;
+  padding: 6px 7px;
+  border: 1px solid rgba(154, 223, 196, 0.12);
+  background: rgba(3, 17, 12, 0.38);
+}
+
+.codec-intel-evaluation .codec-data-kv dd {
+  margin-top: 3px;
+  font-weight: 800;
+}
+
 .codec-panel__footer {
   min-height: 54px;
   padding: 8px 16px max(8px, env(safe-area-inset-bottom));
@@ -367,13 +425,62 @@ body.codec-link-closing .codec-stage::after {
   50% { filter: brightness(1.26); }
 }
 
-@media (max-width: 620px) {
+@media (min-width: 821px) {
+  .codec-stage,
+  .codec-transcript {
+    transition: padding-right 300ms steps(7, end), right 300ms steps(7, end);
+  }
+
+  body.codec-panels-open .codec-stage {
+    padding-right: calc(min(440px, 38vw) + clamp(8px, 2vw, 28px));
+  }
+
+  body.codec-panels-open .codec {
+    max-width: calc(100vw - min(440px, 38vw) - clamp(32px, 4vw, 52px));
+  }
+
+  body.codec-panels-open .codec-panel-backdrop {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  body.codec-panels-open .codec-transcript {
+    right: calc(min(440px, 38vw) + 12px);
+    width: auto;
+  }
+}
+
+@media (max-width: 820px) {
   .codec-panel {
-    width: calc(100vw - 16px);
+    top: auto;
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    width: auto;
+    height: min(58dvh, 560px);
+    border-top: 1px solid rgba(154, 223, 196, 0.72);
+    border-left-color: rgba(154, 223, 196, 0.28);
+    transform: translateY(calc(100% + 12px));
+  }
+
+  body.codec-panels-open .codec-panel {
+    transform: translateY(0);
   }
 
   .codec-panel-handle {
-    height: 68px;
+    top: 42%;
+    bottom: auto;
+    height: 90px;
+    transform: translateY(-50%);
+  }
+
+  body.codec-panels-open .codec-panel-handle {
+    transform: translateY(-50%);
+  }
+
+  body.codec-panels-open .codec-panel-backdrop {
+    opacity: 0.28;
+    pointer-events: auto;
   }
 
   .codec-panel__header {

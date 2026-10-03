@@ -1,0 +1,16 @@
+{
+  "name": "miura-projects",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "install:editing": "npm --prefix apps/editing-app ci",
+    "install:mei-ling": "npm --prefix apps/mei-ling ci",
+    "install:curriculum": "npm --prefix apps/curriculum/mediakit ci",
+    "start:editing": "npm --prefix apps/editing-app start",
+    "start:mei-ling": "npm --prefix apps/mei-ling start",
+    "dev:curriculum": "npm --prefix apps/curriculum/mediakit run dev",
+    "test:editing": "npm --prefix apps/editing-app test",
+    "test:mei-ling": "npm --prefix apps/mei-ling run verify",
+    "build:curriculum": "npm --prefix apps/curriculum/mediakit run build"
+  }
+}

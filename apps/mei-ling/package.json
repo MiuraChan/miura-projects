@@ -1,0 +1,16 @@
+{
+  "name": "mei-ling-codec",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A local MGS-inspired creator strategy codec for Miura.",
+  "scripts": {
+    "start": "node --env-file=.env.local start.mjs",
+    "dev": "node --watch --env-file=.env.local server.mjs",
+    "check": "node --check start.mjs && node --check server.mjs && node --check brain/scheduler.mjs && node --check public/app.js && node --check public/service-worker.js",
+    "test": "node --test brain/*.test.mjs",
+    "verify": "npm run check && npm test",
+    "voice": "C:\\tmp\\mei-kokoro-env\\Scripts\\python.exe local_voice.py"
+  },
+  "dependencies": {}
+}

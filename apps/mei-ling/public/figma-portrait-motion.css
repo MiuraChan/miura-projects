@@ -1,0 +1,53 @@
+/*
+ * Portrait contract from Figma nodes 12:111 and 12:119.
+ * Character art, phosphor wash, scanlines and frame stay as separate layers.
+ */
+.portrait__image {
+  filter: contrast(1.08) brightness(0.84) saturate(0.78);
+}
+
+.portrait--mei {
+  animation: figma-mei-presence 4s linear infinite;
+}
+
+.portrait--miura {
+  animation: figma-miura-presence 4s linear infinite;
+}
+
+.codec.is-appearing .portrait--mei {
+  animation:
+    mei-arrival 1050ms 420ms steps(7, end) both,
+    figma-mei-presence 4s 1900ms linear infinite;
+}
+
+.codec.is-appearing .portrait--miura {
+  animation:
+    miura-arrival 1050ms 620ms steps(7, end) both,
+    figma-miura-presence 4s 1900ms linear infinite;
+}
+
+@keyframes figma-mei-presence {
+  0% { opacity: 0.68; }
+  51.25% { animation-timing-function: ease-out; opacity: 0.68; }
+  55% { opacity: 1; }
+  94.5% { animation-timing-function: ease-out; opacity: 1; }
+  100% { opacity: 0.68; }
+}
+
+@keyframes figma-miura-presence {
+  0% { animation-timing-function: ease-out; opacity: 0.72; }
+  5.5% { opacity: 1; }
+  31.25% { animation-timing-function: ease-out; opacity: 1; }
+  36.25% { animation-timing-function: ease-out; opacity: 0.68; }
+  100% { opacity: 0.72; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portrait--mei,
+  .portrait--miura,
+  .codec.is-appearing .portrait--mei,
+  .codec.is-appearing .portrait--miura {
+    animation: none !important;
+    opacity: 1;
+  }
+}

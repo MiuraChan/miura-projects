@@ -1,0 +1,6 @@
+node_modules/
+coverage/
+release/
+tmp/
+*.log
+.DS_Store

@@ -14,12 +14,15 @@
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "test:electron": "node scripts/electron-smoke.cjs",
-    "test:all": "npm run test && npm run test:electron && npm run test:ffmpeg && npm run test:edit && npm run test:edit-resilience && npm run test:ai",
+    "test:all": "npm run test && npm run test:electron && npm run test:ffmpeg && npm run test:edit && npm run test:edit-resilience && npm run test:formats && npm run test:ai",
     "dist": "npm run test:all && electron-builder --win portable",
     "test:ffmpeg": "electron scripts/ffmpeg-integration.cjs",
     "test:ai": "electron scripts/local-ai-integration.cjs",
+    "test:preview": "electron scripts/preview-integration.cjs",
     "test:edit": "electron scripts/edit-integration.cjs",
-    "test:edit-resilience": "electron scripts/edit-resilience-integration.cjs"
+    "test:edit-resilience": "electron scripts/edit-resilience-integration.cjs",
+    "test:formats": "electron scripts/format-integration.cjs",
+    "test:real": "electron scripts/real-vod-e2e.cjs"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^3.2.4",

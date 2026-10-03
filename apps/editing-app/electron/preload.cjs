@@ -6,12 +6,15 @@ contextBridge.exposeInMainWorld("grayfoxDesktop", Object.freeze({
   loadWorkspace: () => ipcRenderer.invoke("workspace:load"),
   saveWorkspace: (workspace) => ipcRenderer.invoke("workspace:save", workspace),
   chooseVideo: () => ipcRenderer.invoke("video:choose"),
+  findRememberedVideo: (options) => ipcRenderer.invoke("video:find-near-export", options),
   chooseTranscript: () => ipcRenderer.invoke("dialogue:choose"),
   restoreVideo: (filePath) => ipcRenderer.invoke("video:restore", filePath),
   checkMediaTools: () => ipcRenderer.invoke("video:tools"),
   analyzeVideo: (options) => ipcRenderer.invoke("video:analyze", options),
+  searchMemes: (options) => ipcRenderer.invoke("meme:search", options),
   produceVideo: (options) => ipcRenderer.invoke("video:produce", options),
   produceEditedVideo: (options) => ipcRenderer.invoke("video:produce-edit", options),
+  exportApprovedVideo: (options) => ipcRenderer.invoke("video:export-approved", options),
   createHandoff: (options) => ipcRenderer.invoke("video:handoff", options),
   onProductionProgress: (callback) => {
     const listener = (_event, progress) => callback(progress);

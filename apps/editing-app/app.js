@@ -10,7 +10,7 @@ function createGrayfoxApp(doc, win) {
     file: null,
     source: null,
     tokens: [],
-    activeView: "video-ops",
+    activeView: "shorts",
     workspace: null,
     projectId: `project-${Date.now()}`,
     projectName: "Untitled edit",
@@ -27,9 +27,13 @@ function createGrayfoxApp(doc, win) {
     thumbnailCaptureHandler: null,
     previewRepresentsSource: false,
     memeEditsDirty: false,
+    memeSearchResults: [],
+    firstCutStale: false,
+    reviewCutEnd: null,
   };
 
   const urlParams = new win.URLSearchParams(win.location.search);
+  const initialView = urlParams.get("screen") === "video-ops" ? "video-ops" : "shorts";
   if (urlParams.get("mobile") === "1") doc.body.classList.add("mobile-capture");
 
   const elements = {
@@ -40,9 +44,12 @@ function createGrayfoxApp(doc, win) {
     empty: doc.querySelector("#empty-state"),
     toneInput: doc.querySelector("#tone-token"),
     tokenList: doc.querySelector("#token-list"),
+    toneTokenCount: doc.querySelector("#tone-token-count"),
     direction: doc.querySelector("#direction"),
     finalUse: doc.querySelector("#final-use"),
-    targetMinutes: doc.querySelector("#target-minutes"),
+    minimumMinutes: doc.querySelector("#minimum-minutes"),
+    maximumMinutes: doc.querySelector("#maximum-minutes"),
+    durationRangeHelp: doc.querySelector("#duration-range-help"),
     brief: doc.querySelector("#brief-copy"),
     toast: doc.querySelector("#toast"),
     projectName: doc.querySelector("#project-name"),
@@ -50,7 +57,7 @@ function createGrayfoxApp(doc, win) {
     workspaceModal: doc.querySelector("#workspace-modal"),
     workspaceUserName: doc.querySelector("#workspace-user-name"),
     workspaceExportPath: doc.querySelector("#workspace-export-path"),
-    browserFolderInput: doc.querySelector("#browser-folder-input"),
+    chooseExportPathButton: doc.querySelector("#choose-export-path"),
     browserFolderHelp: doc.querySelector("#browser-folder-help"),
     workspaceError: doc.querySelector("#workspace-error"),
     workspaceName: doc.querySelector("#workspace-name"),
@@ -77,9 +84,13 @@ function createGrayfoxApp(doc, win) {
     editPlanSummary: doc.querySelector("#edit-plan-summary"),
     memeEditor: doc.querySelector("#meme-editor"),
     memeBeatList: doc.querySelector("#meme-beat-list"),
-    memeLibrary: doc.querySelector("#meme-library"),
     memeEditorCount: doc.querySelector("#meme-editor-count"),
     applyMemeEdits: doc.querySelector("#apply-meme-edits"),
+    memeSearchForm: doc.querySelector("#meme-search-form"),
+    memeSearchInput: doc.querySelector("#meme-search-input"),
+    memeSearchButton: doc.querySelector("#meme-search-button"),
+    memeSearchResults: doc.querySelector("#meme-search-results"),
+    memeSearchStatus: doc.querySelector("#meme-search-status"),
     replaceVideo: doc.querySelector("#replace-video"),
     trimStart: doc.querySelector("#trim-start"),
     trimEnd: doc.querySelector("#trim-end"),
@@ -101,9 +112,15 @@ function createGrayfoxApp(doc, win) {
     revisionNotes: doc.querySelector("#revision-notes"),
     renderRevision: doc.querySelector("#render-revision"),
     handoffPanel: doc.querySelector("#handoff-panel"),
+    handoffSecondary: doc.querySelector("#handoff-secondary"),
+    toggleHandoffOptions: doc.querySelector("#toggle-handoff-options"),
     handoffTarget: doc.querySelector("#handoff-target"),
     createHandoff: doc.querySelector("#create-handoff"),
     handoffStatus: doc.querySelector("#handoff-status"),
+    cutReviewList: doc.querySelector("#cut-review-list"),
+    exportFormat: doc.querySelector("#export-format"),
+    saveApprovedFormat: doc.querySelector("#save-approved-format"),
+    formatExportStatus: doc.querySelector("#format-export-status"),
     helpPopover: doc.querySelector("#help-popover"),
     helpTitle: doc.querySelector("#help-title"),
     helpCopy: doc.querySelector("#help-copy"),
@@ -223,7 +240,15 @@ function createGrayfoxApp(doc, win) {
       projects: Array.isArray(workspace.projects) ? workspace.projects.map((project) => ({
         ...project,
         source: project.source || (project.sourceName ? { name: project.sourceName, path: null, size: 0, lastModified: 0, duration: 0 } : null),
-        editor: project.editor || { finalUse: "Website / landing page", targetMinutes: 0, direction: "", tokens: [] },
+        editor: (() => {
+          const editor = project.editor || { finalUse: "Website / landing page", direction: "", tokens: [] };
+          const legacyTarget = Math.max(0, Number(editor.targetMinutes) || 0);
+          return {
+            ...editor,
+            minimumMinutes: Math.max(0, Number(editor.minimumMinutes) || legacyTarget),
+            maximumMinutes: Math.max(0, Number(editor.maximumMinutes) || legacyTarget),
+          };
+        })(),
         shorts: project.shorts || { length: "30–45 seconds", platform: "TikTok", tone: "" },
         trim: project.trim || { start: 0, end: 0 },
       })) : [],
@@ -244,8 +269,10 @@ function createGrayfoxApp(doc, win) {
 
   async function initializeWorkspace() {
     if (!desktop) {
-      elements.workspaceExportPath.readOnly = false;
-      elements.workspaceExportPath.placeholder = "Choose a folder or type its name";
+      elements.workspaceExportPath.readOnly = true;
+      elements.workspaceExportPath.placeholder = "Browser Downloads (test mode)";
+      elements.chooseExportPathButton.textContent = "Use browser Downloads";
+      elements.browserFolderHelp.textContent = "Browser test: no Windows address is needed. Exports use your browser Downloads; open Grayfox desktop to choose a real folder.";
       elements.browserFolderHelp.hidden = false;
       // Never leave the file preview blank while a browser storage API is pending.
       elements.workspaceModal.hidden = false;
@@ -258,6 +285,7 @@ function createGrayfoxApp(doc, win) {
       applyWorkspace(savedWorkspace);
       const currentProject = state.workspace.projects.find((project) => project.id === state.workspace.currentProjectId) || state.workspace.projects[0];
       if (currentProject) await restoreProject(currentProject);
+      activateView(initialView);
       showToast(`Welcome back, ${state.workspace.userName}. Your production settings are ready.`);
       return savedWorkspace;
     }
@@ -276,35 +304,13 @@ function createGrayfoxApp(doc, win) {
       return selectedPath;
     }
 
-    if (typeof win.showDirectoryPicker === "function") {
-      try {
-        const directory = await win.showDirectoryPicker();
-        elements.workspaceExportPath.value = directory.name;
-        showExportPath(directory.name);
-        elements.workspaceError.textContent = "";
-        showToast(`Folder “${directory.name}” selected.`);
-        return directory.name;
-      } catch (error) {
-        if (error?.name === "AbortError") return null;
-        elements.browserFolderInput.click();
-        return null;
-      }
-    }
-    elements.browserFolderInput.click();
-    return null;
-  }
-
-  elements.browserFolderInput.addEventListener("change", (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const relativePath = file.webkitRelativePath || file.name;
-    const folderName = relativePath.split(/[\\/]/).filter(Boolean)[0];
-    if (!folderName) return;
-    elements.workspaceExportPath.value = folderName;
-    showExportPath(folderName);
+    const browserTarget = "Browser Downloads (test mode)";
+    elements.workspaceExportPath.value = browserTarget;
+    showExportPath(browserTarget);
     elements.workspaceError.textContent = "";
-    showToast(`Folder “${folderName}” selected.`);
-  });
+    showToast("Browser test folder ready. No address required.");
+    return browserTarget;
+  }
 
   function renderProfileImage() {
     const image = normalizeProfileImage(state.profileImage);
@@ -394,7 +400,9 @@ function createGrayfoxApp(doc, win) {
     const userName = elements.workspaceUserName.value.trim();
     const exportPath = elements.workspaceExportPath.value.trim();
     if (!userName || !exportPath) {
-      elements.workspaceError.textContent = "Add your name and choose an export folder.";
+      elements.workspaceError.textContent = desktop
+        ? "Add your name and choose an export folder."
+        : "Add your name and confirm the browser test folder.";
       return false;
     }
     const previousProjects = state.workspace?.projects || [];
@@ -431,7 +439,8 @@ function createGrayfoxApp(doc, win) {
       source: state.source ? { ...state.source } : null,
       editor: {
         finalUse: elements.finalUse.value,
-        targetMinutes: Math.max(0, Number(elements.targetMinutes.value) || 0),
+        minimumMinutes: Math.max(0, Number(elements.minimumMinutes.value) || 0),
+        maximumMinutes: Math.max(0, Number(elements.maximumMinutes.value) || 0),
         direction: elements.direction.value,
         tokens: [...state.tokens],
       },
@@ -448,8 +457,12 @@ function createGrayfoxApp(doc, win) {
         outputPath: state.firstCut.outputPath,
         duration: Number(state.firstCut.duration) || 0,
         targetDuration: Number(state.firstCut.targetDuration) || 0,
+        minimumDuration: Number(state.firstCut.minimumDuration) || 0,
+        maximumDuration: Number(state.firstCut.maximumDuration) || 0,
         approval: state.firstCut.approval || "pending",
         approvedAt: state.firstCut.approvedAt || null,
+        briefSignature: state.firstCut.renderedBriefSignature || null,
+        toneProfile: state.firstCut.editPlan?.toneProfile || state.firstCut.analysis?.toneProfile || null,
         segments: (state.firstCut.editPlan?.segments || state.firstCut.segments || []).map((segment) => ({ ...segment })),
       } : null,
       lastExportPath: state.lastExportPath,
@@ -471,6 +484,7 @@ function createGrayfoxApp(doc, win) {
   }
 
   async function restoreProject(project) {
+    let recoveredLegacySource = false;
     state.projectId = project.id;
     state.projectName = project.name || "Untitled edit";
     state.projectStatus = project.status || "Draft";
@@ -479,7 +493,11 @@ function createGrayfoxApp(doc, win) {
     state.tokens = Array.isArray(project.editor?.tokens) ? [...project.editor.tokens] : [];
     elements.projectName.value = state.projectName;
     elements.finalUse.value = project.editor?.finalUse || "Website / landing page";
-    elements.targetMinutes.value = Number(project.editor?.targetMinutes) > 0 ? project.editor.targetMinutes : "";
+    const legacyTargetMinutes = Math.max(0, Number(project.editor?.targetMinutes) || 0);
+    const savedMinimumMinutes = Math.max(0, Number(project.editor?.minimumMinutes) || legacyTargetMinutes);
+    const savedMaximumMinutes = Math.max(0, Number(project.editor?.maximumMinutes) || legacyTargetMinutes);
+    elements.minimumMinutes.value = savedMinimumMinutes || "";
+    elements.maximumMinutes.value = savedMaximumMinutes || "";
     elements.direction.value = project.editor?.direction || "";
     elements.shortLength.value = project.shorts?.length || "30–45 seconds";
     elements.shortTone.value = project.shorts?.tone || "";
@@ -494,17 +512,31 @@ function createGrayfoxApp(doc, win) {
       if (restored) loadVideo({ ...state.source, ...restored }, { persist: false, notify: false });
       else showToast(`Reconnect “${state.source.name}”; the saved file moved.`);
     } else if (state.source?.name) {
-      elements.empty.querySelector("h2").textContent = `Reconnect ${state.source.name}`;
-      elements.empty.querySelector("p").textContent = "The project data is safe; browsers cannot reopen local video bytes automatically.";
+      const recovered = desktop?.findRememberedVideo
+        ? await desktop.findRememberedVideo({ name: state.source.name, exportPath: project.exportPath || state.workspace?.exportPath })
+        : null;
+      if (recovered?.path) {
+        recoveredLegacySource = true;
+        loadVideo({ ...state.source, ...recovered }, { persist: false, notify: false });
+      } else {
+        elements.empty.querySelector("h2").textContent = `Reconnect ${state.source.name}`;
+        elements.empty.querySelector("p").textContent = "The project data is safe; choose Replace video to reconnect the local source.";
+      }
     }
     if (project.editReview?.outputPath) {
       const segments = Array.isArray(project.editReview.segments) ? project.editReview.segments.map((segment) => ({ ...segment })) : [];
       state.firstCut = {
         ...project.editReview,
-        editPlan: { segments, outputDuration: Number(project.editReview.duration) || 0 },
-        analysis: { memeBeatCount: segments.filter((segment) => Object.values(memePresets).some((preset) => preset.effect === segment.effect) && segment.memeEnabled !== false).length },
+        renderedBriefSignature: project.editReview.briefSignature || null,
+        editPlan: { segments, outputDuration: Number(project.editReview.duration) || 0, toneProfile: project.editReview.toneProfile || null },
+        analysis: {
+          memeBeatCount: segments.filter((segment) => Object.values(memePresets).some((preset) => preset.effect === segment.effect) && segment.memeEnabled !== false).length,
+          toneProfile: project.editReview.toneProfile || null,
+        },
       };
       state.memeEditsDirty = false;
+      state.firstCutStale = (Boolean(state.firstCut.renderedBriefSignature) && state.firstCut.renderedBriefSignature !== currentBriefSignature())
+        || cutViolatesCurrentDuration(state.firstCut);
       if (desktop?.restoreVideo) {
         const restoredCut = await desktop.restoreVideo(project.editReview.outputPath);
         if (restoredCut?.url) {
@@ -514,9 +546,14 @@ function createGrayfoxApp(doc, win) {
       }
       renderMemeEditor();
       updateReviewPanel();
+      if (state.firstCutStale) showStaleCutState("The saved cut does not match the current brief or duration window.", { notify: false });
     }
-    activateView(project.view || "video-ops");
+    activateView(project.view || "shorts");
     updateBrief();
+    if (recoveredLegacySource) {
+      await saveProject(state.projectStatus);
+      showToast(`Reconnected ${state.source.name} and restored its preview.`);
+    }
   }
 
   doc.querySelector("#choose-export-path").addEventListener("click", chooseExportPath);
@@ -538,6 +575,7 @@ function createGrayfoxApp(doc, win) {
     state.transcript = null;
     state.projectThumbnail = null;
     state.firstCut = null;
+    state.firstCutStale = false;
     state.memeEditsDirty = false;
     if (elements.memeEditor) elements.memeEditor.hidden = true;
     if (elements.dialogueSourceStatus) elements.dialogueSourceStatus.textContent = "Auto-detect embedded or matching .srt/.vtt";
@@ -567,6 +605,17 @@ function createGrayfoxApp(doc, win) {
     if (options.notify !== false) showToast(`${state.source.name} is ready and saved to this project.`);
     return true;
   }
+
+  elements.preview.addEventListener("error", () => {
+    const label = state.previewRepresentsSource ? (state.source?.name || "source video") : "rendered cut";
+    elements.empty.querySelector("h2").textContent = `Preview unavailable for ${label}`;
+    elements.empty.querySelector("p").textContent = state.previewRepresentsSource
+      ? "The file may have moved or use a codec Chromium cannot play. Choose Replace video to reconnect it."
+      : "The rendered file may have moved. Render the cut again to create a new preview.";
+    elements.preview.style.display = "none";
+    elements.empty.style.display = "grid";
+    showToast(`Preview unavailable for ${label}. The project data is still safe.`);
+  });
 
   function captureProjectThumbnail() {
     const sourceWidth = Number(elements.preview.videoWidth) || 0;
@@ -681,7 +730,7 @@ function createGrayfoxApp(doc, win) {
     state.tokens.push(value);
     elements.toneInput.value = "";
     renderTokens();
-    updateBrief();
+    handleEditBriefChange();
     return true;
   }
 
@@ -699,11 +748,19 @@ function createGrayfoxApp(doc, win) {
       remove.addEventListener("click", () => {
         state.tokens = state.tokens.filter((item) => item !== token);
         renderTokens();
-        updateBrief();
+        handleEditBriefChange();
       });
       chip.append(text, remove);
       elements.tokenList.appendChild(chip);
     });
+    if (elements.toneTokenCount) elements.toneTokenCount.textContent = `${state.tokens.length} / 6 tags`;
+  }
+
+  function toneSignalSegmentLength() {
+    const normalized = state.tokens.join(" ").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, " ");
+    if (/(energetic|energy|fast|punchy|direct|irreverent|bold|dynamic|energico|energia|rapido|incalzante|diretto|irriverente|audace|dinamico)/i.test(normalized)) return 6;
+    if (/(calm|slow|natural|warm|reflective|intimate|measured|calmo|lento|naturale|caldo|riflessivo|intimo|misurato)/i.test(normalized)) return 14;
+    return 10;
   }
 
   elements.toneInput.addEventListener("keydown", (event) => {
@@ -714,7 +771,7 @@ function createGrayfoxApp(doc, win) {
     if (event.key === "Backspace" && !elements.toneInput.value && state.tokens.length) {
       state.tokens.pop();
       renderTokens();
-      updateBrief();
+      handleEditBriefChange();
     }
   });
 
@@ -722,31 +779,124 @@ function createGrayfoxApp(doc, win) {
     button.addEventListener("click", () => addToken(button.textContent));
   });
 
-  function parseRequestedDurationSeconds(value) {
+  function parseDurationRequirement(value) {
     const normalized = String(value || "").replace(",", ".");
-    const match = normalized.match(/(\d+(?:\.\d+)?)\s*(hours?|hrs?|hr|h|minutes?|mins?|min|m|seconds?|secs?|sec|s)\b/i);
-    if (!match) return 0;
+    const match = normalized.match(/(\d+(?:\.\d+)?)\s*(hours?|hrs?|hr|h|ore?|ora|minutes?|mins?|min|m|minuti?|minuto|seconds?|secs?|sec|s|secondi?|secondo)\b/i);
+    if (!match) return null;
     const amount = Number(match[1]);
-    if (!Number.isFinite(amount) || amount <= 0) return 0;
+    if (!Number.isFinite(amount) || amount <= 0) return null;
     const unit = match[2].toLowerCase();
-    if (unit.startsWith("h")) return amount * 3600;
-    if (unit.startsWith("s")) return amount;
-    return amount * 60;
+    const seconds = /^(?:h|hr|hrs|hour|or|ora|ore)/.test(unit)
+      ? amount * 3600
+      : (/^(?:s|sec|secs|second)/.test(unit) ? amount : amount * 60);
+    const context = normalized.slice(Math.max(0, match.index - 48), match.index).toLowerCase();
+    const maximum = /(no more than|not more than|at most|less than|under|up to|massimo|al massimo|meno di|non oltre|entro)\s*$/i.test(context);
+    const strictMinimum = /(more than|longer than|over|pi[uù] di|oltre|superiore a)\s*$/i.test(context);
+    const inclusiveMinimum = /(at least|minimum of|minimum|minimo di|minimo|almeno|non meno di)\s*$/i.test(context);
+    return {
+      seconds,
+      kind: maximum ? "maximum" : ((strictMinimum || inclusiveMinimum) ? "minimum" : "exact"),
+      strict: maximum
+        ? /(?:less than|under|meno di)\s*$/i.test(context)
+        : strictMinimum,
+    };
+  }
+
+  function parseRequestedDurationSeconds(value) {
+    const requirement = parseDurationRequirement(value);
+    return requirement?.kind === "exact" ? requirement.seconds : 0;
+  }
+
+  function productionDurationRange() {
+    const minimumMinutes = Number(elements.minimumMinutes.value);
+    const maximumMinutes = Number(elements.maximumMinutes.value);
+    const hasMinimum = Number.isFinite(minimumMinutes) && minimumMinutes > 0;
+    const hasMaximum = Number.isFinite(maximumMinutes) && maximumMinutes > 0;
+    const valid = hasMinimum && hasMaximum && maximumMinutes >= minimumMinutes;
+    return {
+      minimumMinutes: hasMinimum ? minimumMinutes : 0,
+      maximumMinutes: hasMaximum ? maximumMinutes : 0,
+      minimumSeconds: hasMinimum ? minimumMinutes * 60 : 0,
+      maximumSeconds: hasMaximum ? maximumMinutes * 60 : 0,
+      valid,
+      reason: !hasMinimum || !hasMaximum
+        ? "Enter both minimum and maximum duration."
+        : (maximumMinutes < minimumMinutes ? "Maximum duration must be greater than or equal to minimum duration." : ""),
+    };
   }
 
   function requestedProductionSeconds() {
-    const explicitMinutes = Number(elements.targetMinutes.value);
-    if (Number.isFinite(explicitMinutes) && explicitMinutes > 0) return explicitMinutes * 60;
-    const directedDuration = parseRequestedDurationSeconds(elements.direction.value);
-    if (directedDuration > 0) return directedDuration;
-    const useLengths = {
-      "Website / landing page": 45,
-      "YouTube": 90,
-      "Internal presentation": 90,
-      "Paid social campaign": 30,
-      "Event highlight": 60,
-    };
-    return useLengths[elements.finalUse.value] || 45;
+    const range = productionDurationRange();
+    return range.valid ? range.maximumSeconds : 0;
+  }
+
+  function shortStableHash(value) {
+    let hash = 2166136261;
+    for (const character of String(value || "")) {
+      hash ^= character.charCodeAt(0);
+      hash = Math.imul(hash, 16777619);
+    }
+    return `gf-${(hash >>> 0).toString(16).padStart(8, "0")}`;
+  }
+
+  function currentBriefSignature() {
+    return shortStableHash(JSON.stringify({
+      source: state.source ? [state.source.path || state.source.name, Number(state.source.size) || 0, Number(state.source.lastModified) || 0] : null,
+      finalUse: elements.finalUse.value,
+      minimumMinutes: Math.max(0, Number(elements.minimumMinutes.value) || 0),
+      maximumMinutes: Math.max(0, Number(elements.maximumMinutes.value) || 0),
+      direction: elements.direction.value.trim(),
+      tokens: [...state.tokens],
+    }));
+  }
+
+  function cutViolatesCurrentDuration(firstCut = state.firstCut) {
+    if (!firstCut?.outputPath) return false;
+    const range = productionDurationRange();
+    const duration = Number(firstCut.duration) || 0;
+    if (!range.valid || !duration) return false;
+    const minimumTolerance = Math.max(2, range.minimumSeconds * 0.03);
+    const maximumTolerance = Math.max(2, range.maximumSeconds * 0.03);
+    return duration < range.minimumSeconds - minimumTolerance || duration > range.maximumSeconds + maximumTolerance;
+  }
+
+  function editPlanFingerprint(editPlan) {
+    const segments = editPlan?.segments || [];
+    return shortStableHash(JSON.stringify(segments.map((segment) => ({
+      start: Number(Number(segment.start).toFixed(3)),
+      end: Number(Number(segment.end).toFixed(3)),
+      role: segment.role || "body",
+      effect: segment.effect || null,
+      memeEnabled: segment.memeEnabled !== false,
+      memeStart: Number.isFinite(Number(segment.memeStart)) ? Number(Number(segment.memeStart).toFixed(3)) : null,
+      memeEnd: Number.isFinite(Number(segment.memeEnd)) ? Number(Number(segment.memeEnd).toFixed(3)) : null,
+    }))));
+  }
+
+  function showStaleCutState(reason = "The editing brief changed.", { notify = true } = {}) {
+    if (!state.firstCut?.outputPath) return false;
+    const wasStale = state.firstCutStale;
+    state.firstCutStale = true;
+    state.firstCut.approval = "pending";
+    state.firstCut.approvedAt = null;
+    state.projectStatus = "Needs render";
+    const actionShell = elements.createCut.closest(".button-with-help");
+    if (actionShell) actionShell.hidden = false;
+    elements.createCut.innerHTML = "<span>✦</span> Render updated cut";
+    elements.processingPanel.hidden = false;
+    elements.processingPanel.classList.remove("ready");
+    elements.processingTitle.textContent = "Changes not rendered";
+    elements.processingEta.textContent = "Preview shows the previous cut";
+    elements.processingCuriosity.textContent = `${reason} Render an updated cut before approval or export.`;
+    updateReviewPanel();
+    if (notify && !wasStale) showToast("Brief changed. Render the updated cut to apply it to the video.");
+    return true;
+  }
+
+  function handleEditBriefChange() {
+    updateBrief();
+    showStaleCutState("The current controls no longer match the rendered file.");
+    scheduleSave();
   }
 
   function updateBrief() {
@@ -756,15 +906,23 @@ function createGrayfoxApp(doc, win) {
     const directionPart = elements.direction.value.trim()
       ? `. Direction: ${elements.direction.value.trim()}`
       : ".";
-    const explicitTarget = Number(elements.targetMinutes.value) > 0 ? Number(elements.targetMinutes.value) * 60 : parseRequestedDurationSeconds(elements.direction.value);
-    const targetPart = explicitTarget ? ` Target output: ${formatClipTime(explicitTarget)}.` : "";
+    const range = productionDurationRange();
+    const targetPart = range.valid
+      ? ` Duration window: ${formatClipTime(range.minimumSeconds)}–${formatClipTime(range.maximumSeconds)}.`
+      : ` Duration window incomplete. ${range.reason}`;
+    elements.minimumMinutes.setAttribute("aria-invalid", String(Boolean(range.minimumMinutes && range.maximumMinutes && !range.valid)));
+    elements.maximumMinutes.setAttribute("aria-invalid", String(Boolean(range.minimumMinutes && range.maximumMinutes && !range.valid)));
+    elements.durationRangeHelp.textContent = range.valid
+      ? `Grayfox may finish anywhere from ${formatClipTime(range.minimumSeconds)} to ${formatClipTime(range.maximumSeconds)}. Written directions cannot override it.`
+      : range.reason;
     elements.brief.textContent = `${filePart} ${usePart}${tokenPart}${directionPart}${targetPart}`;
     return elements.brief.textContent;
   }
 
-  elements.direction.addEventListener("input", () => { updateBrief(); scheduleSave(); });
-  elements.finalUse.addEventListener("change", () => { updateBrief(); scheduleSave(); });
-  elements.targetMinutes.addEventListener("input", updateBrief);
+  elements.direction.addEventListener("input", handleEditBriefChange);
+  elements.finalUse.addEventListener("change", handleEditBriefChange);
+  elements.minimumMinutes.addEventListener("input", handleEditBriefChange);
+  elements.maximumMinutes.addEventListener("input", handleEditBriefChange);
 
   function activateView(view) {
     state.activeView = view;
@@ -780,7 +938,7 @@ function createGrayfoxApp(doc, win) {
     button.addEventListener("click", () => activateView(button.dataset.view));
   });
 
-  if (urlParams.get("screen") === "shorts") activateView("shorts");
+  activateView(initialView);
 
   doc.querySelectorAll(".segmented button").forEach((button) => {
     button.addEventListener("click", () => {
@@ -789,7 +947,7 @@ function createGrayfoxApp(doc, win) {
     });
   });
 
-  [elements.shortLength, elements.shortTone, elements.trimStart, elements.trimEnd, elements.targetMinutes].forEach((input) => {
+  [elements.shortLength, elements.shortTone, elements.trimStart, elements.trimEnd].forEach((input) => {
     input.addEventListener("input", scheduleSave);
     input.addEventListener("change", scheduleSave);
   });
@@ -815,7 +973,10 @@ function createGrayfoxApp(doc, win) {
     const segments = editPlan?.segments || [];
     elements.editPlanSummary.hidden = !segments.length;
     const visibleSegments = segments.slice(0, 12);
-    elements.editPlanSummary.innerHTML = visibleSegments.map((segment, index) =>
+    const toneChip = editPlan?.toneProfile?.label
+      ? `<span class="edit-plan-chip">Tone · ${escapeHtml(editPlan.toneProfile.label)}</span>`
+      : "";
+    elements.editPlanSummary.innerHTML = toneChip + visibleSegments.map((segment, index) =>
       `<span class="edit-plan-chip">${index + 1} · ${formatClipTime(segment.start)}–${formatClipTime(segment.end)} · ${escapeHtml(segment.role || "body")}</span>`
     ).join("") + (segments.length > visibleSegments.length
       ? `<span class="edit-plan-chip">+${segments.length - visibleSegments.length} more cuts</span>`
@@ -828,8 +989,86 @@ function createGrayfoxApp(doc, win) {
     flash: { effect: "meme-flash", label: "Impact flash", reason: "User-selected impact flash" },
   });
 
-  function memeEffectLabel(effect) {
-    return Object.values(memePresets).find((preset) => preset.effect === effect)?.label || "Meme effect";
+  const memeCatalog = Object.freeze([
+    { id: "dramatic-zoom", presetId: "punch", label: "Dramatic zoom", description: "Shock, emphasis or plot twist", glyph: "+", previewClass: "preview-punch", keywords: ["shock", "reaction", "reveal", "plot twist", "emphasis", "sorpresa", "reazione", "colpo di scena"] },
+    { id: "side-eye", presetId: "punch", label: "Side eye", description: "Doubt, suspicion or disbelief", glyph: "?", previewClass: "preview-punch", keywords: ["side eye", "suspicious", "doubt", "lie", "disbelief", "non ci credo", "sospetto", "dubbio", "bugia"] },
+    { id: "wait-what", presetId: "punch", label: "Wait, what?", description: "Interrupt a confusing moment", glyph: "?!", previewClass: "preview-punch", keywords: ["wait", "what", "confused", "interruption", "mistake", "aspetta", "cosa", "confusione", "errore"] },
+    { id: "awkward-silence", presetId: "monochrome", label: "Awkward silence", description: "Cringe, pause or dry failure", glyph: "…", previewClass: "preview-mono", keywords: ["awkward", "silence", "cringe", "pause", "fail", "dry", "imbarazzo", "silenzio", "pausa", "fallimento"] },
+    { id: "record-scratch", presetId: "monochrome", label: "Record scratch", description: "Freeze a wrong turn", glyph: "||", previewClass: "preview-mono", keywords: ["record scratch", "freeze", "mistake", "wrong", "stop", "errore", "sbaglio", "fermo", "aspetta"] },
+    { id: "deadpan", presetId: "monochrome", label: "Deadpan", description: "A dry or sarcastic response", glyph: "—", previewClass: "preview-mono", keywords: ["deadpan", "dry", "sarcastic", "irony", "blank", "sarcasmo", "ironico", "secco"] },
+    { id: "big-reveal", presetId: "flash", label: "Big reveal", description: "Discovery, surprise or payoff", glyph: "*", previewClass: "preview-flash", keywords: ["big reveal", "discovery", "surprise", "payoff", "plot twist", "rivelazione", "scoperta", "sorpresa", "finale"] },
+    { id: "main-character", presetId: "flash", label: "Main character", description: "Victory, confidence or entrance", glyph: "^", previewClass: "preview-flash", keywords: ["main character", "victory", "win", "confidence", "entrance", "epic", "vittoria", "successo", "sicurezza", "entrata", "epico"] },
+  ]);
+
+  const memeSearchAliases = Object.freeze({
+    imbarazzante: ["awkward", "cringe"], imbarazzo: ["awkward", "cringe"], silenzio: ["silence"], pausa: ["pause"],
+    rivelazione: ["reveal", "surprise"], sorpresa: ["surprise", "shock"], sospetto: ["suspicious"], dubbio: ["doubt"],
+    vittoria: ["victory", "win"], epico: ["epic"], errore: ["mistake", "wrong"], aspetta: ["wait", "stop"],
+    sarcastico: ["sarcastic", "deadpan"], ironico: ["irony", "deadpan"], reazione: ["reaction"],
+  });
+
+  function normalizedMemeTokens(value) {
+    const tokens = String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().match(/[a-z0-9]+/g) || [];
+    return [...new Set(tokens.flatMap((token) => [token, ...(memeSearchAliases[token] || [])]))];
+  }
+
+  function searchMemeCatalog(query = "", limit = 6) {
+    const tokens = normalizedMemeTokens(query);
+    if (!tokens.length) return memeCatalog.slice(0, limit);
+    const ranked = memeCatalog.map((entry, index) => {
+      const label = `${entry.label} ${entry.description}`.toLowerCase();
+      const keywords = entry.keywords.join(" ").toLowerCase();
+      const score = tokens.reduce((total, token) => total
+        + (label.includes(token) ? 5 : 0)
+        + (keywords.includes(token) ? 3 : 0), 0);
+      return { entry, index, score };
+    }).sort((a, b) => b.score - a.score || a.index - b.index);
+    return (ranked.some((item) => item.score > 0) ? ranked : ranked.map((item) => ({ ...item, score: 0 })))
+      .slice(0, limit)
+      .map((item) => item.entry);
+  }
+
+  function renderMemeSearchResults(results = searchMemeCatalog(""), status = "Local vocabulary ready · LM Studio is optional") {
+    if (!elements.memeSearchResults) return results;
+    state.memeSearchResults = results;
+    elements.memeSearchResults.innerHTML = results.length ? results.map((entry) => `
+      <button class="meme-search-result" type="button" role="listitem" data-meme-result="${escapeHtml(entry.id)}" title="Insert ${escapeHtml(entry.label)} at the current playhead">
+        <span class="meme-library-preview ${escapeHtml(entry.previewClass)}" aria-hidden="true">${escapeHtml(entry.glyph)}</span>
+        <strong>${escapeHtml(entry.label)}</strong>
+        <small>${escapeHtml(entry.description)}</small>
+      </button>`).join("") : `<p class="meme-search-empty">No matching overlay. Try a feeling, reaction or story beat.</p>`;
+    if (elements.memeSearchStatus) elements.memeSearchStatus.textContent = status;
+    return results;
+  }
+
+  async function performMemeSearch(query = elements.memeSearchInput?.value || "") {
+    const cleanQuery = String(query || "").trim().slice(0, 180);
+    const localResults = searchMemeCatalog(cleanQuery);
+    renderMemeSearchResults(localResults, cleanQuery ? "Local matches ready · checking LM Studio…" : "Local vocabulary ready · LM Studio is optional");
+    if (!cleanQuery || !desktop?.searchMemes) return localResults;
+    if (elements.memeSearchButton) elements.memeSearchButton.disabled = true;
+    try {
+      const response = await desktop.searchMemes({
+        query: cleanQuery,
+        candidates: memeCatalog.map(({ id, label, description, keywords }) => ({ id, label, description, keywords })),
+      });
+      const byId = new Map(memeCatalog.map((entry) => [entry.id, entry]));
+      const ranked = response?.provider === "lm-studio"
+        ? (response.results || []).map((item) => byId.get(item.id)).filter(Boolean)
+        : [];
+      const unique = [...new Map([...ranked, ...localResults].map((entry) => [entry.id, entry])).values()].slice(0, 6);
+      const provider = response?.provider === "lm-studio" ? "LM Studio semantic order" : "Local vocabulary";
+      const fallback = response?.fallbackReason ? " · model unavailable" : "";
+      return renderMemeSearchResults(unique, `${provider}${fallback} · click a result to overlay it`);
+    } catch {
+      return renderMemeSearchResults(localResults, "Local vocabulary · LM Studio unavailable");
+    } finally {
+      if (elements.memeSearchButton) elements.memeSearchButton.disabled = false;
+    }
+  }
+
+  function memeEffectLabel(effect, segment = null) {
+    return segment?.memeLabel || Object.values(memePresets).find((preset) => preset.effect === effect)?.label || "Meme effect";
   }
 
   function memeSegments(editPlan = state.firstCut?.editPlan) {
@@ -862,15 +1101,20 @@ function createGrayfoxApp(doc, win) {
       const time = Number.isFinite(Number(segment.memeStart)) ? Number(segment.memeStart) : Number(segment.start);
       return `<article class="meme-beat${enabled ? "" : " disabled"}" data-meme-segment="${index}">
         <span class="meme-beat-signal" aria-hidden="true"></span>
-        <div class="meme-beat-copy"><strong>${escapeHtml(memeEffectLabel(segment.effect))}${segment.memeSuggested ? " · AI suggestion" : ""}</strong><span class="meme-beat-time">At <input type="number" step="0.5" min="${Number(segment.start).toFixed(1)}" max="${Math.max(segment.start, segment.end - 0.2).toFixed(1)}" value="${time.toFixed(1)}" data-meme-time aria-label="Meme effect ${beatIndex + 1} source time in seconds"> sec</span></div>
+        <div class="meme-beat-copy"><strong>${escapeHtml(memeEffectLabel(segment.effect, segment))}${segment.memeSuggested ? " · AI suggestion" : ""}</strong><span class="meme-beat-time">At <input type="number" step="0.5" min="${Number(segment.start).toFixed(1)}" max="${Math.max(segment.start, segment.end - 0.2).toFixed(1)}" value="${time.toFixed(1)}" data-meme-time aria-label="Meme effect ${beatIndex + 1} source time in seconds"> sec</span></div>
         <div class="meme-beat-actions"><button type="button" data-meme-action="earlier" title="Move 1 second earlier">−1</button><button type="button" data-meme-action="later" title="Move 1 second later">+1</button><button type="button" data-meme-action="toggle">${enabled ? "Remove" : "Restore"}</button></div>
       </article>`;
     }).join("") : `<p class="meme-library-empty">No meme effects inserted. Play the cut, pause on a beat and choose one above.</p>`;
   }
 
-  function addMemePreset(presetId) {
+  function addMemePreset(presetId, memeId = null) {
     const preset = memePresets[presetId];
+    const catalogEntry = memeCatalog.find((entry) => entry.id === memeId && entry.presetId === presetId) || null;
     const segments = state.firstCut?.editPlan?.segments || [];
+    if (state.firstCutStale) {
+      showToast("Render the updated brief before adding meme overlays.");
+      return false;
+    }
     if (!preset || !segments.length) {
       showToast("Create the first cut before inserting meme effects.");
       return false;
@@ -884,13 +1128,15 @@ function createGrayfoxApp(doc, win) {
     segment.memeSuggested = false;
     segment.memeStart = Number(Math.min(Math.max(sourceTime, Number(segment.start)), Math.max(Number(segment.start), Number(segment.end) - 0.2)).toFixed(3));
     segment.memeEnd = Number(Math.min(Number(segment.end), segment.memeStart + 1.2).toFixed(3));
-    segment.memeReason = preset.reason;
+    segment.memeId = catalogEntry?.id || presetId;
+    segment.memeLabel = catalogEntry?.label || preset.label;
+    segment.memeReason = catalogEntry ? `User-selected ${catalogEntry.label} from Grayfox meme search` : preset.reason;
     state.memeEditsDirty = true;
     state.firstCut.approval = "pending";
     renderMemeEditor();
     updateReviewPanel();
     elements.reviewStatus.textContent = "Meme changes not rendered";
-    showToast(`${preset.label} inserted at ${formatClipTime(segment.memeStart)}. Render changes to review it.`);
+    showToast(`${segment.memeLabel} inserted at ${formatClipTime(segment.memeStart)}. Render changes to review it.`);
     return true;
   }
   function updateMemeBeat(segmentIndex, { delta = 0, time = null, toggle = false } = {}) {
@@ -914,8 +1160,12 @@ function createGrayfoxApp(doc, win) {
 
   async function applyMemeChanges() {
     const segments = state.firstCut?.editPlan?.segments || [];
+    if (state.firstCutStale) {
+      showToast("Render the updated brief before applying meme overlays.");
+      return null;
+    }
     if (!state.memeEditsDirty || !segments.length) return state.firstCut;
-    if (!desktop?.produceEditedVideo || segments.length < 2) {
+    if (!desktop?.produceEditedVideo) {
       showToast("This meme revision needs the Grayfox multi-segment desktop renderer.");
       return null;
     }
@@ -929,7 +1179,8 @@ function createGrayfoxApp(doc, win) {
         exportPath: state.workspace.exportPath,
         projectName: `${state.projectName}-meme-revision`,
         segments,
-        expectedDuration: Number(state.firstCut.targetDuration) || Number(state.firstCut.editPlan.outputDuration) || 0,
+        minimumDuration: Number(state.firstCut.minimumDuration) || Number(state.firstCut.targetDuration) || Number(state.firstCut.editPlan.outputDuration) || 0,
+        maximumDuration: Number(state.firstCut.maximumDuration) || Number(state.firstCut.targetDuration) || Number(state.firstCut.editPlan.outputDuration) || 0,
       });
       state.firstCut = { ...state.firstCut, ...result, approval: "pending" };
       state.memeEditsDirty = false;
@@ -953,10 +1204,16 @@ function createGrayfoxApp(doc, win) {
       return null;
     }
   }
-  elements.memeLibrary?.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-meme-preset]");
-    if (button) addMemePreset(button.dataset.memePreset);
-  });  elements.memeBeatList?.addEventListener("click", (event) => {
+  elements.memeSearchForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    performMemeSearch();
+  });
+  elements.memeSearchResults?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-meme-result]");
+    const entry = memeCatalog.find((item) => item.id === button?.dataset.memeResult);
+    if (entry) addMemePreset(entry.presetId, entry.id);
+  });
+  elements.memeBeatList?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-meme-action]");
     const card = button?.closest("[data-meme-segment]");
     if (!button || !card) return;
@@ -1017,19 +1274,55 @@ function createGrayfoxApp(doc, win) {
     }
     const cuts = firstCutCount();
     const approval = state.firstCut.approval || "pending";
+    const stale = state.firstCutStale;
     const dialogueProvider = state.firstCut.analysis?.dialogueProvider || "visual-and-audio-signals";
     const dialogueCount = Number(state.firstCut.analysis?.dialogueCueCount) || 0;
     elements.reviewPanel.hidden = false;
     elements.cutCount.textContent = `${cuts} cut${cuts === 1 ? "" : "s"}`;
-    elements.reviewStatus.textContent = approval === "approved" ? "Approved" : (approval === "changes-requested" ? "Changes requested" : "Decision required");
+    elements.reviewStatus.textContent = stale ? "Previous cut · render required" : (approval === "approved" ? "Approved" : (approval === "changes-requested" ? "Changes requested" : "Decision required"));
     const excludedRanges = state.firstCut.analysis?.excludedRanges || [];
     const excludedSeconds = excludedRanges.reduce((total, range) => total + Math.max(0, range.end - range.start), 0);
     const compliance = excludedRanges.length ? ` · ${excludedRanges.length} required exclusion${excludedRanges.length === 1 ? "" : "s"} enforced (${formatClipTime(excludedSeconds)})` : "";
     const memes = Number(state.firstCut.analysis?.memeBeatCount) ? ` · ${state.firstCut.analysis.memeBeatCount} visual meme beat${state.firstCut.analysis.memeBeatCount === 1 ? "" : "s"}` : "";
-    elements.reviewSummary.textContent = `${formatClipTime(state.firstCut.duration)} rendered · dialogue: ${dialogueCount ? `${dialogueCount} cues via ${dialogueProvider}` : "no transcript available; visual and speech-activity signals used"}${compliance}${memes}.`;
-    elements.revisionBox.hidden = approval !== "changes-requested";
-    elements.handoffPanel.hidden = approval !== "approved";
-    elements.approveCut.disabled = approval === "approved";
+    const toneProfile = state.firstCut.editPlan?.toneProfile || state.firstCut.analysis?.toneProfile;
+    const appliedTone = toneProfile?.label ? ` · tone tags applied: ${toneProfile.label}` : "";
+    const staleWarning = stale ? "This preview predates the current brief. " : "";
+    elements.reviewSummary.textContent = `${staleWarning}${formatClipTime(state.firstCut.duration)} rendered · dialogue: ${dialogueCount ? `${dialogueCount} cues via ${dialogueProvider}` : "no transcript available; visual and speech-activity signals used"}${compliance}${memes}${appliedTone}.`;
+    elements.revisionBox.hidden = stale || approval !== "changes-requested";
+    if (stale || approval !== "approved") elements.handoffPanel.hidden = true;
+    elements.approveCut.disabled = stale || approval === "approved";
+    renderCutReviewList();
+  }
+
+  function renderCutReviewList() {
+    if (!elements.cutReviewList) return;
+    const segments = state.firstCut?.editPlan?.segments || state.firstCut?.segments || [];
+    if (!segments.length) {
+      elements.cutReviewList.innerHTML = state.firstCut?.outputPath
+        ? `<article class="cut-review-item"><div><strong>Complete rendered cut</strong><small>00:00–${formatClipTime(state.firstCut.duration || 0)} in the approved output</small></div><button class="secondary-button" type="button" data-review-cut="0" data-output-start="0" data-output-end="${Number(state.firstCut.duration) || 0}">Preview</button></article>`
+        : "";
+      return;
+    }
+    let cursor = 0;
+    elements.cutReviewList.innerHTML = segments.map((segment, index) => {
+      const length = Math.max(0, Number(segment.end) - Number(segment.start));
+      const outputStart = cursor;
+      cursor += length;
+      const meme = segment.effect && segment.memeEnabled !== false ? ` · ${memeEffectLabel(segment.effect, segment)}` : "";
+      return `<article class="cut-review-item"><div><strong>Cut ${index + 1} · ${escapeHtml(segment.role || "body")}</strong><small>Source ${formatClipTime(segment.start)}–${formatClipTime(segment.end)} · output ${formatClipTime(outputStart)}–${formatClipTime(cursor)}${escapeHtml(meme)}</small></div><button class="secondary-button" type="button" data-review-cut="${index}" data-output-start="${outputStart}" data-output-end="${cursor}">Preview</button></article>`;
+    }).join("");
+  }
+
+  function previewReviewedCut(button) {
+    if (!state.firstCut?.outputPath || !elements.preview) return false;
+    const start = Math.max(0, Number(button?.dataset?.outputStart) || 0);
+    const end = Math.max(start, Number(button?.dataset?.outputEnd) || Number(state.firstCut.duration) || 0);
+    elements.preview.currentTime = start;
+    state.reviewCutEnd = end;
+    const playback = elements.preview.play?.();
+    if (playback?.catch) playback.catch(() => {});
+    showToast(`Previewing cut ${Number(button?.dataset?.reviewCut || 0) + 1}.`);
+    return true;
   }
 
   async function approveFirstCut() {
@@ -1041,17 +1334,25 @@ function createGrayfoxApp(doc, win) {
       showToast("Render a first cut before approving it.");
       return false;
     }
+    if (state.firstCutStale) {
+      showToast("Render the updated cut before approving it.");
+      return false;
+    }
     state.firstCut.approval = "approved";
     state.firstCut.approvedAt = new Date().toISOString();
     state.projectStatus = "Approved";
     updateReviewPanel();
     await saveProject("Approved");
-    showToast("Cut approved. Adobe and social handoffs are now available.");
+    showToast("Cut approved. Save is ready; other destinations are optional.");
     return true;
   }
 
   function requestFirstCutChanges() {
     if (!state.firstCut?.outputPath) return false;
+    if (state.firstCutStale) {
+      showToast("Render the updated cut first; the current preview is from the previous brief.");
+      return false;
+    }
     state.firstCut.approval = "changes-requested";
     state.projectStatus = "Needs changes";
     updateReviewPanel();
@@ -1072,7 +1373,7 @@ function createGrayfoxApp(doc, win) {
   }
 
   async function createApprovedHandoff() {
-    if (state.firstCut?.approval !== "approved" || !state.firstCut?.outputPath) {
+    if (state.firstCutStale || state.firstCut?.approval !== "approved" || !state.firstCut?.outputPath) {
       showToast("Approve the cut before creating an Adobe or social handoff.");
       return null;
     }
@@ -1113,6 +1414,22 @@ function createGrayfoxApp(doc, win) {
   elements.requestChanges?.addEventListener("click", requestFirstCutChanges);
   elements.renderRevision?.addEventListener("click", renderRevision);
   elements.createHandoff?.addEventListener("click", createApprovedHandoff);
+  elements.toggleHandoffOptions?.addEventListener("click", () => {
+    const willOpen = elements.handoffSecondary.hidden;
+    elements.handoffSecondary.hidden = !willOpen;
+    elements.toggleHandoffOptions.setAttribute("aria-expanded", String(willOpen));
+    elements.toggleHandoffOptions.querySelector("span").textContent = willOpen ? "−" : "＋";
+    if (willOpen) elements.handoffTarget.focus();
+  });
+  elements.cutReviewList?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-review-cut]");
+    if (button) previewReviewedCut(button);
+  });
+  elements.preview?.addEventListener("timeupdate", () => {
+    if (state.reviewCutEnd == null || Number(elements.preview.currentTime) < state.reviewCutEnd) return;
+    elements.preview.pause?.();
+    state.reviewCutEnd = null;
+  });
 
   async function createFirstCut() {
     if (!state.source) {
@@ -1124,12 +1441,20 @@ function createGrayfoxApp(doc, win) {
       showToast("Choose an export folder in workspace settings first.");
       return null;
     }
+    const requestedRange = productionDurationRange();
+    if (!requestedRange.valid) {
+      showToast(requestedRange.reason);
+      return null;
+    }
+    const previousEditPlan = state.firstCut?.editPlan || (state.firstCut?.segments?.length ? { segments: state.firstCut.segments } : null);
+    const previousPlanFingerprint = previousEditPlan?.segments?.length ? editPlanFingerprint(previousEditPlan) : null;
+    const requiresChangedRender = Boolean(state.firstCutStale || state.revisionFeedback);
     startFirstCut();
     elements.reviewPanel.hidden = true;
     try {
       const manualStart = Number(elements.trimStart.value) || 0;
       const manualEnd = Number(elements.trimEnd.value) || 0;
-      const targetLength = requestedProductionSeconds();
+      const targetLength = requestedRange.maximumSeconds;
       const effectiveDirection = [elements.direction.value.trim(), state.revisionFeedback ? `Revision request: ${state.revisionFeedback}` : ""].filter(Boolean).join("\n");
       let selectedRange = {
         start: manualStart,
@@ -1143,7 +1468,9 @@ function createGrayfoxApp(doc, win) {
           mode: "edit",
           sourcePath: state.source.path,
           targetLength,
-          segmentLength: state.tokens.some((token) => /fast|energetic|punchy/i.test(token)) ? 6 : 10,
+          minimumDuration: requestedRange.minimumSeconds,
+          maximumDuration: requestedRange.maximumSeconds,
+          segmentLength: toneSignalSegmentLength(),
           finalUse: elements.finalUse.value,
           tone: state.tokens.join(", "),
           direction: effectiveDirection,
@@ -1156,15 +1483,21 @@ function createGrayfoxApp(doc, win) {
         if (state.analysis.directionAuditCount) {
           elements.processingTitle.textContent = "Direction audit complete";
           elements.processingEta.textContent = `${state.analysis.directionAuditCount} timeline samples checked`;
-          elements.processingCuriosity.textContent = `${state.analysis.excludedRanges.length} mandatory exclusion${state.analysis.excludedRanges.length === 1 ? "" : "s"} (${formatClipTime(excludedSeconds)}) · ${state.analysis.memeBeatCount || 0} visual meme beat${state.analysis.memeBeatCount === 1 ? "" : "s"} planned.`;
+          const profileLabel = state.analysis.toneProfile?.label || "Balanced";
+          elements.processingCuriosity.textContent = `${state.analysis.excludedRanges.length} mandatory exclusion${state.analysis.excludedRanges.length === 1 ? "" : "s"} (${formatClipTime(excludedSeconds)}) · ${state.analysis.memeBeatCount || 0} visual meme beat${state.analysis.memeBeatCount === 1 ? "" : "s"} planned · ${profileLabel} tone profile.`;
         }
         const best = state.analysis.candidates?.[0];
         if (best) selectedRange = { start: best.start, end: best.end };
       }
       const editPlan = state.analysis?.editPlan || null;
-      const effectiveTargetLength = Number(state.analysis?.targetLength) || targetLength;
+      const effectiveMinimumDuration = Number(state.analysis?.minimumDuration) || requestedRange.minimumSeconds;
+      const effectiveMaximumDuration = Number(state.analysis?.maximumDuration) || requestedRange.maximumSeconds;
+      const effectiveTargetLength = Number(state.analysis?.targetLength) || effectiveMaximumDuration;
       if (editPlan?.segments?.length === 1) {
         selectedRange = { start: editPlan.segments[0].start, end: editPlan.segments[0].end };
+      }
+      if (requiresChangedRender && previousPlanFingerprint && editPlan?.segments?.length && editPlanFingerprint(editPlan) === previousPlanFingerprint) {
+        throw new Error("The revised brief produced the same timeline as the previous cut. Grayfox stopped instead of exporting an unchanged video. Make the instruction more specific or include a timestamp.");
       }
       renderEditPlanSummary(editPlan);
       elements.processingTitle.textContent = editPlan?.segments?.length > 1
@@ -1175,24 +1508,43 @@ function createGrayfoxApp(doc, win) {
         sourcePath: state.source.path,
         exportPath: state.workspace.exportPath,
         projectName: `${state.projectName}-first-cut`,
-        expectedDuration: effectiveTargetLength,
+        minimumDuration: effectiveMinimumDuration,
+        maximumDuration: effectiveMaximumDuration,
       };
-      const result = editPlan?.segments?.length > 1 && desktop.produceEditedVideo
-        ? await desktop.produceEditedVideo({ ...commonPayload, segments: editPlan.segments, expectedDuration: effectiveTargetLength })
+      const result = editPlan?.segments?.length && desktop.produceEditedVideo
+        ? await desktop.produceEditedVideo({ ...commonPayload, segments: editPlan.segments })
         : await desktop.produceVideo({
           ...commonPayload,
           trimStart: selectedRange.start,
           trimEnd: selectedRange.end,
         });
-      const durationTolerance = Math.max(2, effectiveTargetLength * 0.03);
-      result.targetDuration = Number(result.targetDuration) || effectiveTargetLength;
+      const minimumTolerance = Math.max(2, effectiveMinimumDuration * 0.03);
+      const maximumTolerance = Math.max(2, effectiveMaximumDuration * 0.03);
+      result.minimumDuration = Number(result.minimumDuration) || effectiveMinimumDuration;
+      result.maximumDuration = Number(result.maximumDuration) || effectiveMaximumDuration;
+      result.targetDuration = Number(result.targetDuration) || effectiveMaximumDuration;
       result.meetsTarget = typeof result.meetsTarget === "boolean"
         ? result.meetsTarget
-        : Number(result.duration) >= effectiveTargetLength - durationTolerance;
+        : Number(result.duration) >= effectiveMinimumDuration - minimumTolerance
+          && Number(result.duration) <= effectiveMaximumDuration + maximumTolerance;
       if (!result.meetsTarget && !result.durationWarning) {
-        result.durationWarning = `Rendered ${formatClipTime(result.duration)} of requested ${formatClipTime(effectiveTargetLength)}.`;
+        result.durationWarning = `Rendered ${formatClipTime(result.duration)} outside the requested ${formatClipTime(effectiveMinimumDuration)}–${formatClipTime(effectiveMaximumDuration)} window.`;
       }
-      state.firstCut = { ...result, analysis: state.analysis, editPlan, selectedRange, approval: "pending", revisionFeedback: state.revisionFeedback };
+      const renderedEditPlan = editPlan ? {
+        ...editPlan,
+        segments: Array.isArray(result.segments) && result.segments.length ? result.segments : editPlan.segments,
+        outputDuration: Number(result.duration) || Number(editPlan.outputDuration) || 0,
+      } : null;
+      state.firstCut = {
+        ...result,
+        analysis: state.analysis,
+        editPlan: renderedEditPlan,
+        selectedRange,
+        approval: "pending",
+        revisionFeedback: state.revisionFeedback,
+        renderedBriefSignature: currentBriefSignature(),
+      };
+      state.firstCutStale = false;
       state.memeEditsDirty = false;
       renderMemeEditor();
       if (desktop.restoreVideo) {
@@ -1209,17 +1561,18 @@ function createGrayfoxApp(doc, win) {
         const skippedCount = result.skippedSegments?.length || 0;
         if (!result.meetsTarget) {
           elements.processingTitle.textContent = "First cut incomplete — review source";
-          elements.processingEta.textContent = `${formatClipTime(result.duration)} / ${formatClipTime(result.targetDuration)}`;
+          elements.processingEta.textContent = `${formatClipTime(result.duration)} · requested ${formatClipTime(result.minimumDuration)}–${formatClipTime(result.maximumDuration)}`;
           elements.processingCuriosity.textContent = `${result.durationWarning} ${skippedCount ? `${skippedCount} damaged section${skippedCount === 1 ? " was" : "s were"} skipped. ` : ""}Saved to ${result.outputPath}`;
-          showToast("The file was rendered but did not meet the requested duration.");
+          showToast("The file was rendered but did not meet the requested duration window.");
         } else if (skippedCount) {
           elements.processingTitle.textContent = "First cut ready with a source warning";
           elements.processingEta.textContent = `${formatClipTime(result.duration)} rendered`;
           elements.processingCuriosity.textContent = `${result.segmentCount} sections rendered · ${skippedCount} damaged or incomplete section${skippedCount === 1 ? " was" : "s were"} skipped. Saved to ${result.outputPath}`;
           showToast(`First cut ready. ${skippedCount} damaged source section${skippedCount === 1 ? " was" : "s were"} skipped.`);
         } else {
-          elements.processingEta.textContent = `${formatClipTime(result.duration)} / ${formatClipTime(result.targetDuration)}`;
-          elements.processingCuriosity.textContent = `${result.segmentCount || 1} source section${result.segmentCount === 1 ? "" : "s"} rendered · target duration met · saved to ${result.outputPath}`;
+          elements.processingEta.textContent = `${formatClipTime(result.duration)} · inside ${formatClipTime(result.minimumDuration)}–${formatClipTime(result.maximumDuration)}`;
+          const profileLabel = renderedEditPlan?.toneProfile?.label || "Balanced";
+          elements.processingCuriosity.textContent = `${result.segmentCount || 1} source section${result.segmentCount === 1 ? "" : "s"} rendered · ${profileLabel} tone profile applied · duration window met · saved to ${result.outputPath}`;
         }
       } else if (state.analysis?.candidates?.[0]) {
         const best = state.analysis.candidates[0];
@@ -1415,56 +1768,70 @@ function createGrayfoxApp(doc, win) {
 
   if (desktop?.onProductionProgress) desktop.onProductionProgress(updateProductionProgress);
 
-  async function produceCurrentVideo() {
-    if (!state.source) {
-      showToast("Add a video before exporting.");
+  async function produceCurrentVideo(format = elements.exportFormat?.value || "mp4") {
+    if (state.firstCutStale || state.firstCut?.approval !== "approved" || !state.firstCut?.outputPath) {
+      showToast("Approve the first cut before saving or publishing it.");
       return null;
     }
-    if (!await ensureRenderableSource("Export")) return null;
-    if (state.firstCut?.approval !== "approved") {
-      showToast("Approve the first cut before exporting or publishing it.");
+    if (!state.workspace?.exportPath) {
+      showToast("Choose an export folder in workspace settings first.");
+      return null;
+    }
+    if (!desktop?.exportApprovedVideo) {
+      showToast("Saving approved formats works in the Grayfox desktop app, not the browser preview.");
       return null;
     }
     elements.exportButton.disabled = true;
+    if (elements.saveApprovedFormat) elements.saveApprovedFormat.disabled = true;
     if (elements.productionStatus) elements.productionStatus.hidden = false;
-    if (elements.productionTitle) elements.productionTitle.textContent = "Producing video";
-    if (elements.productionCopy) elements.productionCopy.textContent = "Rendering locally with FFmpeg…";
+    if (elements.productionTitle) elements.productionTitle.textContent = "Saving approved video";
+    if (elements.productionCopy) elements.productionCopy.textContent = "Converting the reviewed cut locally with FFmpeg…";
     updateProductionProgress({ percent: 0 });
     try {
-      const exportPayload = {
-        sourcePath: state.source.path,
+      const result = await desktop.exportApprovedVideo({
+        outputPath: state.firstCut.outputPath,
         exportPath: state.workspace.exportPath,
         projectName: state.projectName,
-      };
-      const editSegments = state.firstCut?.editPlan?.segments || [];
-      const targetDuration = Number(state.firstCut?.targetDuration) || requestedProductionSeconds();
-      const singleSegment = editSegments[0] || null;
-      const result = editSegments.length > 1 && desktop.produceEditedVideo
-        ? await desktop.produceEditedVideo({ ...exportPayload, segments: editSegments, expectedDuration: targetDuration })
-        : await desktop.produceVideo({
-          ...exportPayload,
-          trimStart: singleSegment?.start ?? (Number(elements.trimStart.value) || 0),
-          trimEnd: singleSegment?.end ?? (Number(elements.trimEnd.value) || 0),
-        });
+        format,
+      });
       state.lastExportPath = result.outputPath;
-      if (elements.productionTitle) elements.productionTitle.textContent = "Video ready";
+      if (elements.productionTitle) elements.productionTitle.textContent = "Video saved";
       if (elements.productionCopy) elements.productionCopy.textContent = result.outputPath;
+      if (elements.formatExportStatus) elements.formatExportStatus.textContent = `${result.label || format} saved to ${result.outputPath}`;
       updateProductionProgress({ percent: 100 });
       await saveProject("Exported");
-      showToast("Video produced and saved in your export folder.");
+      showToast(`${result.label || "Approved video"} saved in your export folder.`);
       return result;
     } catch (error) {
-      if (elements.productionTitle) elements.productionTitle.textContent = "Production failed";
-      if (elements.productionCopy) elements.productionCopy.textContent = error.message || "FFmpeg could not produce the video.";
-      showToast(error.message || "Production failed.");
+      if (elements.productionTitle) elements.productionTitle.textContent = "Save failed";
+      if (elements.productionCopy) elements.productionCopy.textContent = error.message || "FFmpeg could not save this format.";
+      if (elements.formatExportStatus) elements.formatExportStatus.textContent = error.message || "FFmpeg could not save this format.";
+      showToast(error.message || "Save failed.");
       return null;
     } finally {
       elements.exportButton.disabled = false;
+      if (elements.saveApprovedFormat) elements.saveApprovedFormat.disabled = false;
     }
   }
 
-  elements.exportButton.addEventListener("click", produceCurrentVideo);
+  function openSaveOptions() {
+    if (state.firstCutStale || state.firstCut?.approval !== "approved") {
+      showToast("Approve the first cut before saving it.");
+      return false;
+    }
+    elements.handoffPanel.hidden = false;
+    elements.handoffSecondary.hidden = true;
+    elements.toggleHandoffOptions.setAttribute("aria-expanded", "false");
+    elements.toggleHandoffOptions.querySelector("span").textContent = "＋";
+    elements.exportFormat?.focus();
+    showToast("Choose the final video format. Other destinations are available as a secondary option.");
+    return true;
+  }
 
+  elements.exportButton.addEventListener("click", openSaveOptions);
+  elements.saveApprovedFormat?.addEventListener("click", () => produceCurrentVideo());
+
+  renderMemeSearchResults();
   updateBrief();
   const ready = initializeWorkspace();
 
@@ -1489,12 +1856,20 @@ function createGrayfoxApp(doc, win) {
     completeFirstCut,
     estimateFirstCutSeconds,
     parseRequestedDurationSeconds,
+    parseDurationRequirement,
+    productionDurationRange,
     requestedProductionSeconds,
+    currentBriefSignature,
+    cutViolatesCurrentDuration,
+    editPlanFingerprint,
+    showStaleCutState,
+    handleEditBriefChange,
     ensureRenderableSource,
     setProfileImage,
     readBrowserWorkspace,
     restoreProject,
     produceCurrentVideo,
+    openSaveOptions,
     createFirstCut,
     findClipRanges,
     renderStoryClip,
@@ -1509,9 +1884,14 @@ function createGrayfoxApp(doc, win) {
     captureProjectThumbnail,
     memeSegments,
     renderMemeEditor,
+    searchMemeCatalog,
+    renderMemeSearchResults,
+    performMemeSearch,
     addMemePreset,
     updateMemeBeat,
     applyMemeChanges,
+    renderCutReviewList,
+    previewReviewedCut,
   };
 }
 

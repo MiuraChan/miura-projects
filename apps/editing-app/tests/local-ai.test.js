@@ -8,6 +8,7 @@ const {
   parseSubtitleCues,
   requestOllamaVision,
   requestLmStudioVision,
+  requestLmStudioMemeRanking,
   buildDirectionAuditWindows,
   extractDirectionRules,
   buildTimelineWindows,
@@ -109,6 +110,28 @@ it("uses the installed LM Studio vision model with structured multimodal output"
   expect(request.response_format.type).toBe("json_schema");
   expect(request.messages[0].content[1].image_url.url).toMatch(/^data:image\/jpeg;base64,/);
 });
+
+it("keeps LM Studio meme search inside the supplied Grayfox catalog", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      choices: [{ message: { content: JSON.stringify({ results: [
+        { id: "big-reveal", reason: "The user asks for a revelation." },
+        { id: "invented-external-meme", reason: "Not in the catalog." },
+      ] }) } }],
+    }),
+  }));
+  const result = await requestLmStudioMemeRanking("una rivelazione", [
+    { id: "big-reveal", label: "Big reveal", description: "Discovery or surprise", keywords: ["reveal", "rivelazione"] },
+    { id: "deadpan", label: "Deadpan", description: "Dry response", keywords: ["sarcasm"] },
+  ]);
+
+  expect(result.provider).toBe("lm-studio");
+  expect(result.results).toEqual([{ id: "big-reveal", reason: "The user asks for a revelation." }]);
+  const request = JSON.parse(fetch.mock.calls.at(-1)[1].body);
+  expect(request.response_format.json_schema.name).toBe("grayfox_meme_ranking");
+  expect(request.messages[0].content[0].text).toContain("Never invent a meme");
+});
 describe("Grayfox direction compliance", () => {
   it("normalizes fractional model scores and deterministically enforces visible removal rules", () => {
     expect(normalizeVisionScore(0.91)).toBe(91);
@@ -163,6 +186,15 @@ describe("Grayfox direction compliance", () => {
     expect(ranges[0]).toEqual(expect.objectContaining({ start: 540, end: 660 }));
     expect(ranges[1]).toEqual(expect.objectContaining({ start: 780, end: 840 }));
   });
+  it("bridges one uncertain 20-second sample inside a coherent removed opening", () => {
+    const ranges = mergeExcludedTimelineRanges([
+      { start: 0, end: 140, decision: "remove", confidence: 92, reason: "Starting Soon" },
+      { start: 140, end: 160, decision: "neutral", confidence: 50, reason: "uncertain transition" },
+      { start: 160, end: 340, decision: "remove", confidence: 91, reason: "Starting Soon continues" },
+    ], 60, 25);
+    expect(ranges).toHaveLength(1);
+    expect(ranges[0]).toEqual(expect.objectContaining({ start: 0, end: 340 }));
+  });
 
   it("adds no more than three grounded meme punches to selected moments", () => {
     const plan = { segments: [{ start: 0, end: 10 }, { start: 20, end: 30 }] };
@@ -172,5 +204,22 @@ describe("Grayfox direction compliance", () => {
     ]);
     expect(count).toBe(2);
     expect(plan.segments.every((segment) => segment.effect === "meme-punch")).toBe(true);
+  });
+
+  it("uses the tone profile as the meme suggestion threshold", () => {
+    const energetic = {
+      toneProfile: { memeThreshold: 68 },
+      segments: [{ start: 0, end: 10 }],
+    };
+    const calm = {
+      toneProfile: { memeThreshold: 88 },
+      segments: [{ start: 0, end: 10 }],
+    };
+    const reviews = [{ start: 2, end: 4, decision: "keep", memeScore: 72, reason: "visible reaction" }];
+
+    expect(applyMemeBeats(energetic, reviews)).toBe(1);
+    expect(applyMemeBeats(calm, reviews)).toBe(0);
+    expect(energetic.segments[0].effect).toBe("meme-punch");
+    expect(calm.segments[0].effect).toBeUndefined();
   });
 });

@@ -4,6 +4,7 @@ const path = require("node:path");
 const fs = require("node:fs/promises");
 const { spawn, execFile } = require("node:child_process");
 const { promisify } = require("node:util");
+const { setTimeout: delay } = require("node:timers/promises");
 const { app } = require("electron");
 const { buildEditPlan } = require("./edit-planner.cjs");
 
@@ -143,7 +144,7 @@ function buildDirectionAuditWindows(duration, rules) {
   return [...detailed, ...remainder].slice(0, 160);
 }
 
-function mergeExcludedTimelineRanges(reviews, minimumConfidence = 60) {
+function mergeExcludedTimelineRanges(reviews, minimumConfidence = 60, maximumGap = 5) {
   const ranges = reviews
     .filter((review) => review.decision === "remove" && Number(review.confidence) >= minimumConfidence)
     .map((review) => ({ start: Number(review.start), end: Number(review.end), reason: review.reason || "direction-match", enforcedBy: review.enforcedBy || null }))
@@ -152,7 +153,7 @@ function mergeExcludedTimelineRanges(reviews, minimumConfidence = 60) {
   const merged = [];
   for (const range of ranges) {
     const previous = merged.at(-1);
-    if (previous && range.start <= previous.end + 5) {
+    if (previous && range.start <= previous.end + Math.max(0, Number(maximumGap) || 0)) {
       previous.end = Math.max(previous.end, range.end);
       previous.reason = `${previous.reason}; ${range.reason}`.slice(0, 500);
     } else merged.push({ ...range });
@@ -169,6 +170,43 @@ function readAssistantJson(payload) {
 }
 
 const lmStudioPreparedInstances = new Map();
+
+async function lmStudioResponds(origin) {
+  try {
+    const response = await fetch(`${origin}/api/v1/models`, { signal: AbortSignal.timeout(4000) });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function ensureLmStudioServer(endpoint) {
+  const url = new URL(endpoint);
+  const origin = url.origin;
+  if (await lmStudioResponds(origin)) return false;
+  if (!["127.0.0.1", "localhost", "::1"].includes(url.hostname)) return false;
+  const executable = process.platform === "win32" ? "lms.exe" : "lms";
+  const candidates = [
+    process.env.GRAYFOX_LMS_PATH,
+    process.env.USERPROFILE ? path.join(process.env.USERPROFILE, ".lmstudio", "bin", executable) : null,
+  ].filter(Boolean);
+  const lmsPath = await candidates.reduce(async (foundPromise, candidate) => {
+    const found = await foundPromise;
+    if (found) return found;
+    try { await fs.access(candidate); return candidate; } catch { return null; }
+  }, Promise.resolve(null));
+  if (!lmsPath) return false;
+  try {
+    await execFileAsync(lmsPath, ["server", "start"], { windowsHide: true, timeout: 30000 });
+  } catch {
+    return false;
+  }
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    if (await lmStudioResponds(origin)) return true;
+    await delay(500);
+  }
+  return false;
+}
 
 async function prepareLmStudioVisionModel(endpoint, model) {
   if (lmStudioPreparedInstances.has(model)) return lmStudioPreparedInstances.get(model);
@@ -201,6 +239,7 @@ async function prepareLmStudioVisionModel(endpoint, model) {
 async function requestLmStudioJson({ prompt, images, schema, schemaName, timeout = 240000 }) {
   const model = process.env.GRAYFOX_LM_STUDIO_MODEL || "qwen/qwen3-vl-4b";
   const endpoint = process.env.GRAYFOX_LM_STUDIO_URL || "http://127.0.0.1:1234/v1/chat/completions";
+  if (await ensureLmStudioServer(endpoint)) lmStudioPreparedInstances.clear();
   const inferenceModel = await prepareLmStudioVisionModel(endpoint, model);
   const response = await fetch(endpoint, {
     method: "POST",
@@ -208,7 +247,10 @@ async function requestLmStudioJson({ prompt, images, schema, schemaName, timeout
     body: JSON.stringify({
       model: inferenceModel,
       temperature: 0.05,
-      max_tokens: 1200,
+      // Qwen3-VL can produce a valid, schema-constrained answer that is still
+      // longer than 1,200 tokens. Truncating it here silently disabled vision
+      // analysis because the JSON parser saw an unterminated final string.
+      max_tokens: 2800,
       messages: [{
         role: "user",
         content: [
@@ -227,6 +269,44 @@ async function requestLmStudioJson({ prompt, images, schema, schemaName, timeout
   return { model, payload: readAssistantJson(await response.json()) };
 }
 
+const memeRankingSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["results"],
+  properties: {
+    results: {
+      type: "array",
+      minItems: 1,
+      maxItems: 6,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "reason"],
+        properties: {
+          id: { type: "string", maxLength: 80 },
+          reason: { type: "string", maxLength: 140 },
+        },
+      },
+    },
+  },
+};
+
+async function requestLmStudioMemeRanking(query, candidates) {
+  const catalog = candidates.map((candidate) => `${candidate.id}: ${candidate.label} — ${candidate.description}; keywords: ${candidate.keywords.join(", ")}`).join("\n");
+  const result = await requestLmStudioJson({
+    prompt: `You rank Grayfox's built-in visual meme overlays for a user's search. Interpret English and Italian intent, emotion, reaction and storytelling language. Return only IDs from the supplied catalog, ordered best first. Never invent a meme or claim an external media asset exists.\nUSER SEARCH: ${query}\nCATALOG:\n${catalog}`,
+    images: [],
+    schema: memeRankingSchema,
+    schemaName: "grayfox_meme_ranking",
+    timeout: 20000,
+  });
+  const allowed = new Set(candidates.map((candidate) => candidate.id));
+  const seen = new Set();
+  const results = (result.payload.results || []).filter((item) => allowed.has(item.id) && !seen.has(item.id) && seen.add(item.id));
+  if (!results.length) throw new Error("LM Studio returned no usable meme IDs.");
+  return { provider: "lm-studio", model: result.model, results };
+}
+
 const timelineReviewSchema = {
   type: "object",
   additionalProperties: false,
@@ -234,6 +314,8 @@ const timelineReviewSchema = {
   properties: {
     reviews: {
       type: "array",
+      minItems: 1,
+      maxItems: 8,
       items: {
         type: "object",
         additionalProperties: false,
@@ -244,7 +326,7 @@ const timelineReviewSchema = {
           confidence: { type: "number", minimum: 0, maximum: 100 },
           semanticScore: { type: "number", minimum: 0, maximum: 100 },
           memeScore: { type: "number", minimum: 0, maximum: 100 },
-          reason: { type: "string" },
+          reason: { type: "string", maxLength: 140 },
         },
       },
     },
@@ -258,6 +340,8 @@ const candidateRankingSchema = {
   properties: {
     rankings: {
       type: "array",
+      minItems: 1,
+      maxItems: 8,
       items: {
         type: "object",
         additionalProperties: false,
@@ -266,9 +350,9 @@ const candidateRankingSchema = {
           index: { type: "integer" },
           semanticScore: { type: "number", minimum: 0, maximum: 100 },
           memeScore: { type: "number", minimum: 0, maximum: 100 },
-          title: { type: "string" },
-          rationale: { type: "string" },
-          memeReason: { type: "string" },
+          title: { type: "string", maxLength: 80 },
+          rationale: { type: "string", maxLength: 180 },
+          memeReason: { type: "string", maxLength: 180 },
         },
       },
     },
@@ -321,8 +405,9 @@ async function requestOllamaTimelineReview(windows, images, rules, brief) {
 
 function applyMemeBeats(editPlan, reviews, maximum = 3) {
   if (!editPlan?.segments?.length) return 0;
+  const minimumScore = clamp(Number(editPlan.toneProfile?.memeThreshold) || 78, 1, 100);
   const ranked = reviews
-    .filter((review) => review.decision !== "remove" && Number(review.memeScore) >= 78)
+    .filter((review) => review.decision !== "remove" && Number(review.memeScore) >= minimumScore)
     .sort((a, b) => Number(b.memeScore) - Number(a.memeScore));
   let applied = 0;
   for (const review of ranked) {
@@ -520,7 +605,7 @@ async function requestLmStudioVision(candidates, images, brief) {
   const result = await requestLmStudioJson({
     prompt: `You are Grayfox, a practical video editor. Rank these candidate frames for this brief: ${brief || "find the strongest self-contained moment"}.
 The supplied contact sheet contains candidate tiles in row-major order, visibly numbered ${candidates.map((_candidate, index) => index).join(", ")}.
-Use scores from 0 to 100. Never invent dialogue or audio. Use only supplied transcript evidence. Evaluate visible subject, action, emotion, clarity, hook, direction match and brand safety. Meme score only describes whether a beat could work with a user-selected meme template; do not insert an effect.`,
+Use scores from 0 to 100. Return one compact entry per numbered tile and keep every explanation to one short sentence. Never invent dialogue or audio. Use only supplied transcript evidence. Evaluate visible subject, action, emotion, clarity, hook, direction match and brand safety. Meme score only describes whether a beat could work with a user-selected meme template; do not insert an effect.`,
     images,
     schema: candidateRankingSchema,
     schemaName: "grayfox_candidate_ranking",
@@ -598,6 +683,27 @@ function timelineDialogueEvidence(windows, cues) {
   }).join(" | ");
 }
 function createLocalAi({ resolveMediaTool, probeDuration, cleanText }) {
+  async function rankMemes(_event, payload) {
+    const query = cleanText(payload?.query, "", 180);
+    const candidates = Array.isArray(payload?.candidates) ? payload.candidates.slice(0, 12).map((candidate) => ({
+      id: cleanText(candidate?.id, "", 80),
+      label: cleanText(candidate?.label, "", 100),
+      description: cleanText(candidate?.description, "", 180),
+      keywords: Array.isArray(candidate?.keywords) ? candidate.keywords.slice(0, 20).map((keyword) => cleanText(keyword, "", 60)).filter(Boolean) : [],
+    })).filter((candidate) => candidate.id && candidate.label) : [];
+    if (!query || !candidates.length) return { provider: "local-keywords", model: null, results: [] };
+    try {
+      return await requestLmStudioMemeRanking(query, candidates);
+    } catch (error) {
+      return {
+        provider: "local-keywords",
+        model: null,
+        results: [],
+        fallbackReason: cleanText(error?.message, "LM Studio unavailable.", 300),
+      };
+    }
+  }
+
   async function analyzeVideo(_event, payload) {
     const sourcePath = cleanText(payload?.sourcePath, "", 2000);
     if (!path.isAbsolute(sourcePath)) throw new Error("Choose a local source video before analysis.");
@@ -607,7 +713,10 @@ function createLocalAi({ resolveMediaTool, probeDuration, cleanText }) {
     const ffmpegPath = await resolveMediaTool("ffmpeg");
     const ffprobePath = await resolveMediaTool("ffprobe");
     const duration = await probeDuration(sourcePath, ffprobePath);
-    const targetLength = clamp(Number(payload?.targetLength) || 30, 3, duration);
+    const requestedTarget = clamp(Number(payload?.targetLength) || 30, 3, duration);
+    const minimumDuration = clamp(Number(payload?.minimumDuration) || requestedTarget, 3, duration);
+    const maximumDuration = clamp(Number(payload?.maximumDuration) || requestedTarget, minimumDuration, duration);
+    const targetLength = maximumDuration;
     const mode = payload?.mode === "edit" ? "edit" : "clips";
     const candidateLength = mode === "edit"
       ? clamp(Number(payload?.segmentLength) || Math.min(12, targetLength / 3), 4, Math.min(20, duration))
@@ -713,8 +822,9 @@ function createLocalAi({ resolveMediaTool, probeDuration, cleanText }) {
       };
       for (let offset = 0; offset < windows.length; offset += 8) {
         const batch = windows.slice(offset, offset + 8);
+        let images = [];
         try {
-          const images = await extractCandidateFrames(sourcePath, batch, ffmpegPath, temporaryDirectory);
+          images = await extractCandidateFrames(sourcePath, batch, ffmpegPath, temporaryDirectory);
           const timelineImages = await createFrameContactSheet(images.length, ffmpegPath, temporaryDirectory, `timeline-sheet-${offset}`);
           const review = await requestLocalTimelineReview(
             batch,
@@ -725,23 +835,42 @@ function createLocalAi({ resolveMediaTool, probeDuration, cleanText }) {
           model = review.model;
           provider = review.provider;
           appendReviews(review.reviews, batch);
-          const missing = batch.map((window, index) => ({ window, image: images[index] }))
-            .filter((entry) => !reviewedStarts.has(entry.window.start));
-          if (missing.length) {
-            const retry = await requestLocalTimelineReview(
-              missing.map((entry) => entry.window),
-              missing.map((entry) => entry.image),
-              directionRules,
-              `${payload?.finalUse || ""}; ${payload?.tone || ""}; ${direction}; timed transcript: ${timelineDialogueEvidence(missing.map((entry) => entry.window), dialogue.cues)}`
-            );
-            appendReviews(retry.reviews, missing.map((entry) => entry.window));
-          }
-          reportProgress(12 + Math.round(((offset + batch.length) / windows.length) * 33), "direction-audit", `Reviewed ${reviewedStarts.size} of ${windows.length} timeline samples`);
         } catch (error) {
-          auditFailures.push(`batch ${offset / 8 + 1}: ${cleanText(error?.message, "unavailable", 160)}`);
+          if (!images.length) {
+            auditFailures.push(`batch ${offset / 8 + 1} frame extraction: ${cleanText(error?.message, "unavailable", 160)}`);
+            continue;
+          }
         }
+        const missing = batch.map((window, index) => ({ window, image: images[index] }))
+          .filter((entry) => !reviewedStarts.has(entry.window.start));
+        for (const entry of missing) {
+          let lastError = null;
+          for (let attempt = 0; attempt < 2 && !reviewedStarts.has(entry.window.start); attempt += 1) {
+            try {
+              const retry = await requestLocalTimelineReview(
+                [entry.window],
+                [entry.image],
+                directionRules,
+                `${payload?.finalUse || ""}; ${payload?.tone || ""}; ${direction}; timed transcript: ${timelineDialogueEvidence([entry.window], dialogue.cues)}`
+              );
+              model = retry.model;
+              provider = retry.provider;
+              appendReviews(retry.reviews, [entry.window]);
+            } catch (error) {
+              lastError = error;
+            }
+          }
+          if (!reviewedStarts.has(entry.window.start)) {
+            auditFailures.push(`sample ${Math.round(entry.window.start)}s: ${cleanText(lastError?.message, "missing model decision", 160)}`);
+          }
+        }
+        reportProgress(12 + Math.round(((offset + batch.length) / windows.length) * 33), "direction-audit", `Reviewed ${reviewedStarts.size} of ${windows.length} timeline samples`);
       }
-      excludedRanges = mergeExcludedTimelineRanges(timelineReviews);
+      excludedRanges = mergeExcludedTimelineRanges(
+        timelineReviews,
+        60,
+        hasOpeningRemovalRule(directionRules) ? 25 : 5
+      );
       if (auditFailures.length) fallbackReason = [fallbackReason, `Direction audit warnings: ${auditFailures.join("; ")}`].filter(Boolean).join(" ").slice(0, 1000);
     }
     const planningCandidates = [...candidates, ...timelineReviews
@@ -760,6 +889,8 @@ function createLocalAi({ resolveMediaTool, probeDuration, cleanText }) {
       dialogueCues: dialogue.cues,
       sourceDuration: duration,
       desiredDuration: targetLength,
+      minimumDuration,
+      maximumDuration,
       direction,
       tone: cleanText(payload?.tone, "", 500),
       excludedRanges,
@@ -769,9 +900,12 @@ function createLocalAi({ resolveMediaTool, probeDuration, cleanText }) {
     return {
       duration,
       targetLength,
+      minimumDuration,
+      maximumDuration,
       provider,
       model,
       editPlan,
+      toneProfile: editPlan?.toneProfile || null,
       fallbackReason,
       directionRules,
       excludedRanges,
@@ -791,7 +925,7 @@ function createLocalAi({ resolveMediaTool, probeDuration, cleanText }) {
     };
   }
 
-  return { analyzeVideo };
+  return { analyzeVideo, rankMemes };
 }
 
 module.exports = {
@@ -807,6 +941,7 @@ module.exports = {
   requestOllamaTimelineReview,
   requestLmStudioVision,
   requestLmStudioTimelineReview,
+  requestLmStudioMemeRanking,
   requestLocalVision,
   requestLocalTimelineReview,
   createFrameContactSheet,
@@ -819,4 +954,5 @@ module.exports = {
   hasPositiveVisibleMatch,
   mergeExcludedTimelineRanges,
   applyMemeBeats,
+  ensureLmStudioServer,
 };

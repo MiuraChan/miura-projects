@@ -7,6 +7,7 @@ const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const { createLocalAi } = require("./local-ai.cjs");
 const { createEditRenderer } = require("./edit-renderer.cjs");
 const { createHandoff } = require("./handoff.cjs");
+const { createFormatExporter } = require("./format-exporter.cjs");
 
 const execFileAsync = promisify(execFile);
 const isSmokeTest = process.env.GRAYFOX_SMOKE_TEST === "1";
@@ -31,6 +32,7 @@ function cleanSource(source) {
 
 function cleanProject(project, exportPath) {
   const editor = project?.editor || {};
+  const legacyTargetMinutes = Math.max(0, Number(editor.targetMinutes) || 0);
   const shorts = project?.shorts || {};
   const trim = project?.trim || {};
   const editReview = project?.editReview || null;
@@ -43,7 +45,8 @@ function cleanProject(project, exportPath) {
     source: cleanSource(project?.source || (project?.sourceName ? { name: project.sourceName } : null)),
     editor: {
       finalUse: cleanText(editor.finalUse, "Website / landing page", 100),
-      targetMinutes: Math.max(0, Number(editor.targetMinutes) || 0),
+      minimumMinutes: Math.max(0, Number(editor.minimumMinutes) || legacyTargetMinutes),
+      maximumMinutes: Math.max(0, Number(editor.maximumMinutes) || legacyTargetMinutes),
       direction: cleanText(editor.direction, "", 5000),
       tokens: Array.isArray(editor.tokens) ? editor.tokens.slice(0, 6).map((token) => cleanText(token, "", 60)).filter(Boolean) : [],
     },
@@ -60,8 +63,21 @@ function cleanProject(project, exportPath) {
       outputPath: path.normalize(String(editReview.outputPath)),
       duration: Math.max(0, Number(editReview.duration) || 0),
       targetDuration: Math.max(0, Number(editReview.targetDuration) || 0),
+      minimumDuration: Math.max(0, Number(editReview.minimumDuration) || Number(editReview.targetDuration) || 0),
+      maximumDuration: Math.max(0, Number(editReview.maximumDuration) || Number(editReview.targetDuration) || 0),
       approval: ["pending", "approved", "changes-requested"].includes(editReview.approval) ? editReview.approval : "pending",
       approvedAt: cleanText(editReview.approvedAt, "", 80) || null,
+      briefSignature: cleanText(editReview.briefSignature, "", 100) || null,
+      toneProfile: editReview.toneProfile && typeof editReview.toneProfile === "object" ? {
+        id: cleanText(editReview.toneProfile.id, "balanced", 60),
+        label: cleanText(editReview.toneProfile.label, "Balanced", 100),
+        chapterSeconds: Math.max(30, Number(editReview.toneProfile.chapterSeconds) || 180),
+        minimumSegment: Math.max(0.2, Number(editReview.toneProfile.minimumSegment) || 0.7),
+        minimumSilence: Math.max(0.1, Number(editReview.toneProfile.minimumSilence) || 0.45),
+        maximumSegments: Math.max(2, Number(editReview.toneProfile.maximumSegments) || 20),
+        shortMaximumSegments: Math.max(2, Number(editReview.toneProfile.shortMaximumSegments) || 6),
+        memeThreshold: Math.min(100, Math.max(1, Number(editReview.toneProfile.memeThreshold) || 78)),
+      } : null,
       segments: Array.isArray(editReview.segments) ? editReview.segments.slice(0, 64).map((segment) => ({
         start: Math.max(0, Number(segment.start) || 0),
         end: Math.max(0, Number(segment.end) || 0),
@@ -71,6 +87,8 @@ function cleanProject(project, exportPath) {
         memeSuggested: segment.memeSuggested === true,
         memeStart: Math.max(0, Number(segment.memeStart) || 0),
         memeEnd: Math.max(0, Number(segment.memeEnd) || 0),
+        memeId: cleanText(segment.memeId, "", 80),
+        memeLabel: cleanText(segment.memeLabel, "", 100),
         memeReason: cleanText(segment.memeReason, "", 300),
       })).filter((segment) => segment.end > segment.start) : [],
     } : null,
@@ -114,12 +132,13 @@ function cleanWorkspaceForStorage(payload) {
       ...project,
       source: project.source ? {
         name: project.source.name,
-        path: null,
-        size: 0,
-        lastModified: 0,
+        // This file never leaves the user's PC. Keep the validated absolute
+        // path so Electron can restore the source preview after a restart.
+        path: project.source.path,
+        size: project.source.size,
+        lastModified: project.source.lastModified,
         duration: project.source.duration,
       } : null,
-      lastExportPath: null,
     })),
   };
 }
@@ -161,6 +180,21 @@ async function describeVideo(filePath) {
   };
 }
 
+async function findRememberedVideo(_event, payload) {
+  const requestedName = cleanText(payload?.name, "", 260);
+  const exportPath = cleanText(payload?.exportPath, "", 2000);
+  const safeName = path.basename(requestedName);
+  if (!safeName || safeName !== requestedName || !path.isAbsolute(exportPath) || !/\.(mp4|mov|mkv|webm|m4v|avi)$/i.test(safeName)) return null;
+  const candidates = [...new Set([
+    path.join(path.normalize(exportPath), safeName),
+    path.join(path.dirname(path.normalize(exportPath)), safeName),
+  ])];
+  for (const candidate of candidates) {
+    try { return await describeVideo(candidate); } catch { /* Try only the next adjacent location. */ }
+  }
+  return null;
+}
+
 async function resolveMediaTool(toolName) {
   const executable = process.platform === "win32" ? `${toolName}.exe` : toolName;
   const configured = process.env[`GRAYFOX_${toolName.toUpperCase()}_PATH`];
@@ -190,9 +224,10 @@ async function probeDuration(filePath, ffprobePath = null) {
   return duration;
 }
 
-const { analyzeVideo } = createLocalAi({ resolveMediaTool, probeDuration, cleanText });
+const { analyzeVideo, rankMemes } = createLocalAi({ resolveMediaTool, probeDuration, cleanText });
 const { produceEditedVideo } = createEditRenderer({ resolveMediaTool, probeDuration, cleanText });
 const handoffApprovedEdit = createHandoff({ shell });
+const exportApprovedVideo = createFormatExporter({ resolveMediaTool, probeDuration, cleanText });
 
 async function produceVideo(event, payload) {
   const sourcePath = cleanText(payload?.sourcePath, "", 2000);
@@ -253,6 +288,7 @@ function registerWorkspaceIpc() {
     const result = await dialog.showOpenDialog({ title: "Choose a source video", buttonLabel: "Use this video", properties: ["openFile"], filters: [{ name: "Videos", extensions: ["mp4", "mov", "mkv", "webm", "m4v", "avi"] }] });
     return result.canceled ? null : describeVideo(result.filePaths[0]);
   });
+  ipcMain.handle("video:find-near-export", findRememberedVideo);
   ipcMain.handle("dialogue:choose", async () => {
     const result = await dialog.showOpenDialog({
       title: "Attach a dialogue transcript",
@@ -270,8 +306,10 @@ function registerWorkspaceIpc() {
     ffprobe: await resolveMediaTool("ffprobe"),
   }));
   ipcMain.handle("video:analyze", analyzeVideo);
+  ipcMain.handle("meme:search", rankMemes);
   ipcMain.handle("video:produce", produceVideo);
   ipcMain.handle("video:produce-edit", produceEditedVideo);
+  ipcMain.handle("video:export-approved", exportApprovedVideo);
   ipcMain.handle("video:handoff", handoffApprovedEdit);
 }
 
@@ -282,7 +320,16 @@ function createWindow() {
   mainWindow.webContents.on("will-navigate", (event, url) => { if (url !== mainWindow.webContents.getURL()) event.preventDefault(); });
   if (isSmokeTest) mainWindow.webContents.once("did-finish-load", async () => {
     const result = await mainWindow.webContents.executeJavaScript(`(async () => {
-      await window.grayfoxDesktop.saveWorkspace({ userName: "Smoke", exportPath: "C:/GrayfoxSmoke", projects: [] });
+      await window.grayfoxDesktop.saveWorkspace({
+        userName: "Smoke",
+        exportPath: "C:/GrayfoxSmoke",
+        currentProjectId: "preview-smoke",
+        projects: [{
+          id: "preview-smoke",
+          name: "Preview smoke",
+          source: { name: "source.mp4", path: "C:/GrayfoxSmoke/source.mp4", size: 1234, lastModified: 42, duration: 60 },
+        }],
+      });
       const loadedWorkspace = await window.grayfoxDesktop.loadWorkspace();
       return {
         title: document.title,
@@ -291,9 +338,10 @@ function createWindow() {
         hasStoryClips: Boolean(document.querySelector("#shorts")),
         onboardingVisible: !document.querySelector("#workspace-modal").hidden,
         persistenceEnabled: loadedWorkspace?.userName === "Smoke" && /GrayfoxSmoke$/.test(loadedWorkspace?.exportPath || ""),
+        sourcePathPersistent: /GrayfoxSmoke.source.mp4$/i.test(loadedWorkspace?.projects?.[0]?.source?.path || ""),
       };
     })()`);
-    const passed = result.hasApp && result.hasVideoOps && result.hasStoryClips && result.onboardingVisible && result.persistenceEnabled;
+    const passed = result.hasApp && result.hasVideoOps && result.hasStoryClips && result.onboardingVisible && result.persistenceEnabled && result.sourcePathPersistent;
     process.stdout.write(`GRAYFOX_SMOKE_${passed ? "OK" : "FAIL"} ${JSON.stringify(result)}\n`);
     if (passed) app.quit(); else app.exit(1);
   });
@@ -305,4 +353,4 @@ if (process.env.GRAYFOX_LIBRARY_MODE !== "1") {
   app.on("window-all-closed", () => { if (process.platform !== "darwin") app.quit(); });
 }
 
-module.exports = { analyzeVideo, cleanWorkspace, cleanWorkspaceForStorage, createWindow, describeVideo, handoffApprovedEdit, loadWorkspaceFromDisk, probeDuration, produceEditedVideo, produceVideo, registerWorkspaceIpc, resolveMediaTool, saveWorkspaceToDisk, workspaceFilePath };
+module.exports = { analyzeVideo, cleanWorkspace, cleanWorkspaceForStorage, createWindow, describeVideo, exportApprovedVideo, findRememberedVideo, handoffApprovedEdit, loadWorkspaceFromDisk, probeDuration, produceEditedVideo, produceVideo, rankMemes, registerWorkspaceIpc, resolveMediaTool, saveWorkspaceToDisk, workspaceFilePath };

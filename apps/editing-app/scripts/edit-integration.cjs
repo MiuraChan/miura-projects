@@ -42,11 +42,13 @@ app.whenReady().then(async () => {
         { start: 4, end: 6, role: "body", effect: "meme-monochrome", memeStart: 4.3, memeEnd: 5.1 },
         { start: 9, end: 11, role: "close", effect: "meme-flash", memeStart: 9.4, memeEnd: 10.2 },
       ],
+      minimumDuration: 4,
+      maximumDuration: 8,
     });
 
     const measured = await probeDuration(result.outputPath, ffprobePath);
     const stat = await fs.stat(result.outputPath);
-    if (result.segmentCount !== 3 || stat.size <= 0 || Math.abs(measured - 6) > 0.2 || !progress.includes(100)) {
+    if (result.segmentCount !== 3 || !result.meetsTarget || result.minimumDuration !== 4 || result.maximumDuration !== 8 || stat.size <= 0 || Math.abs(measured - 6) > 0.2 || !progress.includes(100)) {
       throw new Error(`Invalid multi-edit: ${JSON.stringify({ result, measured, size: stat.size, progress })}`);
     }
 
@@ -60,6 +62,66 @@ app.whenReady().then(async () => {
       throw new Error(`Unexpected codecs: ${JSON.stringify(streams)}`);
     }
 
+    let minimumGuard = "";
+    try {
+      await produceEditedVideo({ sender: { send() {} } }, {
+        sourcePath,
+        exportPath,
+        projectName: "below-minimum",
+        segments: [{ start: 0, end: 2, role: "hook" }],
+        minimumDuration: 6,
+        maximumDuration: 8,
+      });
+    } catch (error) {
+      minimumGuard = error.message;
+    }
+    if (!/minimum is 0:06/i.test(minimumGuard)) {
+      throw new Error(`Minimum duration guard failed: ${minimumGuard || "render unexpectedly started"}`);
+    }
+
+    let maximumGuard = "";
+    try {
+      await produceEditedVideo({ sender: { send() {} } }, {
+        sourcePath,
+        exportPath,
+        projectName: "above-maximum",
+        segments: [{ start: 0, end: 11, role: "hook" }],
+        minimumDuration: 2,
+        maximumDuration: 6,
+      });
+    } catch (error) {
+      maximumGuard = error.message;
+    }
+    if (!/maximum is 0:06/i.test(maximumGuard)) {
+      throw new Error(`Maximum duration guard failed: ${maximumGuard || "render unexpectedly started"}`);
+    }
+
+    const single = await produceEditedVideo({ sender: { send() {} } }, {
+      sourcePath,
+      exportPath,
+      projectName: "verified-single-meme",
+      segments: [{ start: 2, end: 4, role: "hook", effect: "meme-flash", memeEnabled: true, memeStart: 2.4, memeEnd: 3.3 }],
+      expectedDuration: 2,
+    });
+    const singleDuration = await probeDuration(single.outputPath, ffprobePath);
+    if (single.segmentCount !== 1 || Math.abs(singleDuration - 2) > 0.2) {
+      throw new Error(`Invalid one-segment meme edit: ${JSON.stringify({ single, singleDuration })}`);
+    }
+    const frameLuma = async (filePath, seconds) => {
+      const { stdout, stderr } = await execFileAsync(ffmpegPath, [
+        "-hide_banner", "-ss", String(seconds), "-i", filePath,
+        "-frames:v", "1", "-vf", "signalstats,metadata=mode=print:file=-", "-f", "null", "-",
+      ], { windowsHide: true });
+      const match = `${stdout}\n${stderr}`.match(/lavfi\.signalstats\.YAVG=([0-9.]+)/);
+      return match ? Number(match[1]) : NaN;
+    };
+    const sourceLuma = await frameLuma(sourcePath, 2.7);
+    const editedLuma = await frameLuma(single.outputPath, 0.7);
+    const singleMemeLumaDelta = editedLuma - sourceLuma;
+    if (!Number.isFinite(singleMemeLumaDelta) || singleMemeLumaDelta < 8) {
+      throw new Error(`The one-segment visual edit was not visible in the rendered pixels: ${JSON.stringify({ sourceLuma, editedLuma, singleMemeLumaDelta })}`);
+    }
+
     process.stdout.write(`GRAYFOX_EDIT_OK ${JSON.stringify({
       sourceDuration: result.sourceDuration,
       outputDuration: measured,
@@ -67,6 +129,10 @@ app.whenReady().then(async () => {
       segments: result.segmentCount,
       size: stat.size,
       codecs: [video.codec_name, audio.codec_name],
+      durationWindow: [result.minimumDuration, result.maximumDuration],
+      rangeGuards: ["minimum", "maximum"],
+      singleMemeDuration: Number(singleDuration.toFixed(3)),
+      singleMemeLumaDelta: Number(singleMemeLumaDelta.toFixed(3)),
     })}\n`);
   } finally {
     const tempRoot = path.resolve(app.getPath("temp"));

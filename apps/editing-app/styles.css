@@ -46,7 +46,7 @@ body { margin: 0; min-width: 0; min-height: 100vh; background: var(--canvas); fo
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
 
-.app-shell { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+.app-shell { display: grid; grid-template-columns: 232px 1fr; width: 100%; max-width: 1920px; min-height: 100vh; margin: 0 auto; }
 .sidebar {
   position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column;
   padding: 24px 16px 18px; border-right: 1px solid var(--line); background: #fbfcfa;
@@ -100,19 +100,31 @@ button { cursor: pointer; }
 .full { width: 100%; }
 .view { display: none; }
 .view.active { display: block; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
-.workflow-rail {
-  display: flex; align-items: center; gap: 12px; min-height: 62px; margin-bottom: 12px; padding: 8px 16px;
+.meme-search-rail {
+  display: grid; grid-template-columns: minmax(190px, 250px) minmax(300px, 440px) minmax(240px, 1fr); align-items: center; gap: 14px;
+  min-height: 82px; margin-bottom: 12px; padding: 10px 14px;
   border: 1px solid var(--line); border-radius: var(--gf-radius-lg); background: var(--surface);
 }
-.workflow-step { display: grid; grid-template-columns: 24px auto; column-gap: 8px; align-items: center; min-width: 112px; color: var(--gf-text-muted); }
-.workflow-step span { grid-row: 1 / span 2; font-family: "Geist Mono", Consolas, monospace; font-size: 10px; }
-.workflow-step strong { font-size: 12px; line-height: 1.2; }
-.workflow-step small { font-size: 10px; line-height: 1.2; }
-.workflow-step.active { color: var(--gf-text-primary); }
-.workflow-step.active span { color: var(--gf-red); }
-.workflow-line { flex: 1; min-width: 16px; height: 1px; background: var(--gf-border); }
-.editor-grid { display: grid; grid-template-columns: minmax(560px, 1fr) 340px; gap: 18px; height: calc(100vh - 197px); min-height: 590px; }
+.meme-search-intro { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.meme-search-intro > div { display: grid; gap: 2px; min-width: 0; }
+.meme-search-intro strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.meme-search-intro small { overflow: hidden; color: var(--gf-text-secondary); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.meme-search-signal { flex: 0 0 auto; width: 10px; height: 10px; }
+.meme-search-form { display: grid; gap: 4px; min-width: 0; }
+.meme-search-control { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+.meme-search-control input { width: 100%; min-width: 0; height: 38px; padding: 8px 11px; border: 1px solid var(--gf-border); border-radius: var(--gf-radius-md); background: var(--gf-bg); color: var(--gf-text-primary); font-size: 11px; }
+.meme-search-control input:focus { outline: 0; border-color: var(--gf-red); box-shadow: 0 0 0 2px rgba(196,30,30,.08); }
+.meme-search-control .primary-button { min-height: 38px; padding: 7px 13px; }
+#meme-search-status { overflow: hidden; color: var(--gf-text-secondary); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.meme-search-results { display: flex; gap: 7px; min-width: 0; overflow-x: auto; padding: 2px 1px 4px; scrollbar-width: thin; }
+.meme-search-result { display: grid; grid-template-columns: 34px minmax(82px, 1fr); grid-template-rows: auto auto; column-gap: 7px; align-items: center; min-width: 145px; max-width: 190px; padding: 6px; border: 1px solid var(--gf-border); border-radius: var(--gf-radius-md); background: white; color: var(--gf-text-primary); text-align: left; }
+.meme-search-result:hover, .meme-search-result:focus-visible { border-color: var(--gf-red); box-shadow: 0 0 0 2px rgba(196,30,30,.08); }
+.meme-search-result strong { align-self: end; overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.meme-search-result small { align-self: start; overflow: hidden; color: var(--gf-text-secondary); font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+.meme-search-empty { margin: 0; align-self: center; color: var(--gf-text-secondary); font-size: 9px; }
+.editor-grid { display: grid; grid-template-columns: minmax(560px, 1fr) 340px; gap: 18px; height: calc(100vh - 217px); min-height: 560px; }
 .canvas-card, .ai-panel, .candidate-panel, .shorts-intro { border: 1px solid var(--line); border-radius: var(--gf-radius-lg); background: var(--surface); box-shadow: var(--gf-shadow-card); }
 .canvas-card { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-width: 0; overflow: hidden; }
 .video-stage { position: relative; display: grid; place-items: center; margin: 14px; overflow: hidden; border-radius: var(--gf-radius-md); background: var(--gf-dark-surface); }
@@ -122,15 +134,10 @@ button { cursor: pointer; }
 .meme-editor-heading > div { display: grid; gap: 3px; }
 .meme-editor-heading strong { font-size: 12px; }
 #meme-editor-count { color: var(--gf-text-secondary); font-family: "Geist Mono", Consolas, monospace; font-size: 9px; }
-.meme-library { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.meme-library > button { display: grid; grid-template-columns: 40px 1fr; grid-template-rows: auto auto; column-gap: 9px; align-items: center; min-width: 0; padding: 8px; border: 1px solid var(--gf-border); border-radius: var(--gf-radius-md); background: white; color: var(--gf-text-primary); text-align: left; }
-.meme-library > button:hover, .meme-library > button:focus-visible { border-color: var(--gf-red); box-shadow: 0 0 0 2px rgba(196,30,30,.08); }
-.meme-library-preview { grid-row: 1 / 3; display: grid; place-items: center; width: 40px; height: 32px; border-radius: 6px; background: #eff1ef; font-family: "Geist Mono", Consolas, monospace; font-size: 12px; font-weight: 700; }
+.meme-library-preview { grid-row: 1 / 3; display: grid; place-items: center; width: 34px; height: 30px; border-radius: 6px; background: #eff1ef; font-family: "Geist Mono", Consolas, monospace; font-size: 11px; font-weight: 700; }
 .preview-punch { color: var(--gf-red); transform: scale(1.04); }
 .preview-mono { color: #fff; background: #353837; filter: grayscale(1); }
 .preview-flash { color: #8a130f; background: #fff6e9; box-shadow: inset 0 0 12px rgba(196,30,30,.18); }
-.meme-library strong { align-self: end; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.meme-library small { align-self: start; overflow: hidden; color: var(--gf-text-secondary); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
 .meme-timeline-heading { display: flex; justify-content: space-between; gap: 10px; color: var(--gf-text-secondary); font-family: "Geist Mono", Consolas, monospace; font-size: 8px; letter-spacing: .06em; }
 .meme-timeline-heading small { font: inherit; letter-spacing: 0; }.meme-beat-list { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
 .meme-library-empty { margin: 0; padding: 8px 2px; color: var(--gf-text-secondary); font-size: 9px; }
@@ -198,6 +205,11 @@ select:focus, textarea:focus, .standard-input:focus, .token-input-shell:focus-wi
 .label-row { display: flex; justify-content: space-between; }
 .optional { color: #9ba19d; font-size: 9px; }
 .field-help { margin: -2px 0 1px; color: #858c87; font-size: 11px; line-height: 1.45; }
+.field-label { color: var(--gf-ink); font-size: 11px; font-weight: 700; letter-spacing: .02em; }
+.duration-range { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 9px; }
+.duration-range label { display: grid; gap: 5px; color: #727975; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.duration-range-divider { padding-bottom: 10px; color: #9ca29e; font-size: 15px; }
+.duration-range input[aria-invalid="true"] { border-color: var(--gf-red); box-shadow: 0 0 0 2px var(--gf-red-glow); }
 .token-input-shell {
   display: flex; align-items: center; flex-wrap: wrap; gap: 5px; min-height: 42px; padding: 6px 8px;
   border: 1px solid var(--gf-border); border-radius: var(--gf-radius-md); background: white;
@@ -323,11 +335,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 
 @media (max-width: 1120px) {
   .editor-grid { grid-template-columns: minmax(500px, 1fr) 320px; }
+  .meme-search-rail { grid-template-columns: minmax(180px, 220px) minmax(260px, 1fr); }
+  .meme-search-results { grid-column: 1 / -1; }
   .workspace { padding-left: 22px; padding-right: 22px; }
 }
 
 @media (max-width: 760px) {
-  .meme-library { grid-template-columns: 1fr; }
   body { padding-bottom: 74px; }
   .app-shell { display: block; min-height: auto; }
   .sidebar {
@@ -345,10 +358,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .topbar h1 { font-size: 21px; }
   .status-pill { display: none; }
   .secondary-button { min-height: 38px; padding: 7px 12px; }
-  .workflow-rail { gap: 6px; min-height: 52px; margin-bottom: 10px; padding: 7px 9px; overflow-x: auto; }
-  .workflow-step { grid-template-columns: 18px auto; min-width: 76px; }
-  .workflow-step small { display: none; }
-  .workflow-line { min-width: 10px; }
+  .meme-search-rail { display: grid; grid-template-columns: 1fr; gap: 9px; min-height: 0; margin-bottom: 10px; padding: 10px; }
+  .meme-search-results { grid-column: auto; }
+  .meme-search-result { min-width: 138px; }
   .editor-grid { display: flex; flex-direction: column; height: auto; min-height: 0; }
   .canvas-card { grid-template-rows: 310px; min-height: 0; }
   .video-stage { margin: 8px; }
@@ -386,10 +398,9 @@ body.mobile-capture .workspace { padding: 0 12px 86px; }
 body.mobile-capture .topbar { height: 74px; }
 body.mobile-capture .topbar h1 { font-size: 21px; }
 body.mobile-capture .status-pill { display: none; }
-body.mobile-capture .workflow-rail { gap: 6px; min-height: 52px; margin-bottom: 10px; padding: 7px 9px; overflow: hidden; }
-body.mobile-capture .workflow-step { grid-template-columns: 18px auto; min-width: 76px; }
-body.mobile-capture .workflow-step small { display: none; }
-body.mobile-capture .workflow-line { min-width: 10px; }
+body.mobile-capture .meme-search-rail { display: grid; grid-template-columns: 1fr; gap: 9px; min-height: 0; margin-bottom: 10px; padding: 10px; }
+body.mobile-capture .meme-search-results { grid-column: auto; }
+body.mobile-capture .meme-search-result { min-width: 138px; }
 body.mobile-capture .editor-grid { display: flex; flex-direction: column; height: auto; min-height: 0; }
 body.mobile-capture .canvas-card { grid-template-rows: 310px; min-height: 0; }
 body.mobile-capture .video-stage { margin: 8px; }
@@ -488,7 +499,7 @@ body.mobile-capture .candidate-actions { grid-column: 2; flex-direction: row; ju
 }
 
 .review-panel { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--gf-border); border-radius: var(--gf-radius-md); background: #fbfcfa; }
-.review-panel[hidden], .revision-box[hidden], .handoff-panel[hidden] { display: none; }
+.review-panel[hidden], .revision-box[hidden], .handoff-panel[hidden], .handoff-secondary[hidden] { display: none; }
 .review-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .review-heading > div { display: grid; gap: 4px; }
 .review-heading strong { font-size: 14px; }
@@ -501,5 +512,13 @@ body.mobile-capture .candidate-actions { grid-column: 2; flex-direction: row; ju
 .revision-box textarea { min-height: 84px; resize: vertical; padding: 10px; border: 1px solid var(--gf-border); border-radius: var(--gf-radius-md); background: white; }
 .handoff-row select { min-width: 0; flex: 1; }
 .handoff-panel small { color: var(--gf-text-secondary); font-size: 10px; line-height: 1.4; }
+.export-more-button { width: 100%; justify-content: space-between; margin-top: 2px; color: var(--gf-text-secondary); }
+.handoff-secondary { display: grid; gap: 8px; }
+.handoff-divider { height: 1px; margin: 4px 0; background: var(--gf-border); }
+.cut-review-list { display: grid; gap: 6px; }
+.cut-review-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 9px; border: 1px solid var(--gf-border); border-radius: var(--gf-radius-md); background: white; }
+.cut-review-item strong { display: block; font-size: 11px; }
+.cut-review-item small { display: block; margin-top: 2px; color: var(--gf-text-secondary); font-size: 9px; line-height: 1.35; }
+.cut-review-item button { min-height: 32px; padding: 5px 8px; }
 .dialogue-source { display: flex; align-items: center; gap: 8px; }
 .dialogue-source span { color: var(--gf-text-secondary); font-size: 10px; line-height: 1.3; }

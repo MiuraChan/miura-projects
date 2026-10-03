@@ -15,16 +15,7 @@
         </div>
 
         <nav class="nav" aria-label="Primary navigation">
-          <button class="nav-item active" data-view="video-ops">
-            <span class="nav-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <path d="M4 17.5c2.4-6.8 8.1-10.7 16-11.1-1 7.2-5.5 11.8-13 13.2L4 17.5Z" />
-                <path d="M7 17.2 18.2 7.4M9.5 18.1 18.8 9.6M6.2 14.8l11.1 2M8.2 11.7l7.8 5.9" />
-              </svg>
-            </span>
-            Video ops
-          </button>
-          <button class="nav-item" data-view="shorts">
+          <button class="nav-item active" data-view="shorts">
             <span class="nav-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24">
                 <path d="m5 19 10.8-10.8 2 2L7 21H4v-3Z" />
@@ -32,6 +23,15 @@
               </svg>
             </span>
             Story clips
+          </button>
+          <button class="nav-item" data-view="video-ops">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M4 17.5c2.4-6.8 8.1-10.7 16-11.1-1 7.2-5.5 11.8-13 13.2L4 17.5Z" />
+                <path d="M7 17.2 18.2 7.4M9.5 18.1 18.8 9.6M6.2 14.8l11.1 2M8.2 11.7l7.8 5.9" />
+              </svg>
+            </span>
+            Video ops
           </button>
         </nav>
 
@@ -58,25 +58,35 @@
       <main class="workspace">
         <header class="topbar">
           <div>
-            <p class="eyebrow" id="section-label">AI EDITING WORKSPACE</p>
-            <h1 id="page-title">Video ops</h1>
+            <p class="eyebrow" id="section-label">VERTICAL CLIP STUDIO</p>
+            <h1 id="page-title">Story clips</h1>
           </div>
           <div class="top-actions">
             <span class="status-pill"><i class="live-signal"></i> Session active</span>
-            <button class="secondary-button" id="export-button">Export</button>
+            <button class="secondary-button" id="export-button">Save</button>
           </div>
         </header>
 
-        <section class="view active" id="video-ops">
-          <div class="workflow-rail" aria-label="Editing workflow">
-            <div class="workflow-step active"><span>01</span><strong>Import</strong><small>Add source video</small></div>
-            <div class="workflow-line"></div>
-            <div class="workflow-step active"><span>02</span><strong>Direct</strong><small>Set goal and tone</small></div>
-            <div class="workflow-line"></div>
-            <div class="workflow-step"><span>03</span><strong>Review</strong><small>Approve AI cut</small></div>
-            <div class="workflow-line"></div>
-            <div class="workflow-step"><span>04</span><strong>Export</strong><small>Render final video</small></div>
-          </div>
+        <section class="view" id="video-ops">
+          <section class="meme-search-rail" aria-labelledby="meme-search-title">
+            <div class="meme-search-intro">
+              <span class="brand-signal meme-search-signal" aria-hidden="true"></span>
+              <div>
+                <span class="eyebrow">GRAYFOX MEME LANGUAGE</span>
+                <strong id="meme-search-title">Find an overlay</strong>
+                <small>Pause the cut, search a moment, then insert.</small>
+              </div>
+            </div>
+            <form class="meme-search-form" id="meme-search-form" role="search">
+              <label class="sr-only" for="meme-search-input">Search memes by keyword</label>
+              <div class="meme-search-control">
+                <input id="meme-search-input" type="search" autocomplete="off" placeholder="awkward silence, reveal, non ci credo…" />
+                <button class="primary-button" id="meme-search-button" type="submit">Search</button>
+              </div>
+              <small id="meme-search-status" aria-live="polite">Local vocabulary ready · LM Studio is optional</small>
+            </form>
+            <div class="meme-search-results" id="meme-search-results" role="list" aria-label="Meme search results"></div>
+          </section>
           <div class="editor-grid">
             <section class="canvas-card">
               <div class="video-stage" id="video-stage">
@@ -91,13 +101,8 @@
               </div>
               <section class="meme-editor" id="meme-editor" hidden aria-live="polite">
                 <div class="meme-editor-heading">
-                  <div><span class="eyebrow">MEME LIBRARY</span><strong>Insert an effect at the playhead</strong></div>
+                  <div><span class="eyebrow">MEME OVERLAYS</span><strong>Inserted on this cut</strong></div>
                   <span id="meme-editor-count">0 inserted</span>
-                </div>
-                <div class="meme-library" id="meme-library" aria-label="Meme effect collection">
-                  <button type="button" data-meme-preset="punch"><span class="meme-library-preview preview-punch">＋</span><strong>Punch zoom</strong><small>Emphasize a reaction</small></button>
-                  <button type="button" data-meme-preset="monochrome"><span class="meme-library-preview preview-mono">GF</span><strong>Monochrome sting</strong><small>Dry or awkward beat</small></button>
-                  <button type="button" data-meme-preset="flash"><span class="meme-library-preview preview-flash">✦</span><strong>Impact flash</strong><small>Mark a reveal</small></button>
                 </div>
                 <div class="meme-timeline-heading"><span>INSERTED ON THE CUT</span><small>Move, replace or remove before approval</small></div>
                 <div id="meme-beat-list" class="meme-beat-list"></div>
@@ -141,22 +146,26 @@
 
               <div class="field-group">
                 <div class="label-with-help">
-                  <label for="target-minutes">Target duration</label>
-                  <button class="help-button" type="button" data-help-title="Target duration" data-help="This is a production requirement. Enter 40 for a forty-minute output. Grayfox validates the rendered duration before calling the edit complete." aria-label="Explain target duration"><span>?</span></button>
+                  <span class="field-label">Duration window</span>
+                  <button class="help-button" type="button" data-help-title="Duration window" data-help="Minimum is the shortest acceptable cut. Maximum is a hard ceiling. Grayfox may finish anywhere inside this window and never derives these limits from the direction text." aria-label="Explain duration window"><span>?</span></button>
                 </div>
-                <input class="standard-input" id="target-minutes" type="number" min="0.1" step="0.5" inputmode="decimal" placeholder="Auto for selected use" />
-                <p class="field-help">Minutes. Grayfox will never silently replace this with a short highlight.</p>
+                <div class="duration-range">
+                  <label for="minimum-minutes"><span>Minimum</span><input class="standard-input" id="minimum-minutes" type="number" min="0.1" step="0.5" inputmode="decimal" placeholder="e.g. 2" /></label>
+                  <span class="duration-range-divider" aria-hidden="true">–</span>
+                  <label for="maximum-minutes"><span>Maximum</span><input class="standard-input" id="maximum-minutes" type="number" min="0.1" step="0.5" inputmode="decimal" placeholder="e.g. 30" /></label>
+                </div>
+                <p class="field-help" id="duration-range-help">Both values are required. Written directions cannot override this range.</p>
               </div>
 
               <div class="field-group token-field">
                 <div class="label-row">
                   <div class="label-with-help">
                     <label for="tone-token">Tone tokens</label>
-                    <button class="help-button" type="button" data-help-title="Tone tokens" data-help="Add a few words that describe how the edit should feel. Grayfox applies them to pace, music, captions, and cuts." aria-label="Explain tone tokens"><span>?</span></button>
+                    <button class="help-button" type="button" data-help-title="Tone tokens" data-help="Add up to six words that describe how the edit should feel. Grayfox converts them into cut density, average shot length, silence trimming, and the confidence required to suggest a meme." aria-label="Explain tone tokens"><span>?</span></button>
                   </div>
-                  <span class="optional">Optional</span>
+                  <span class="optional" id="tone-token-count">0 / 6 tags</span>
                 </div>
-                <p class="field-help">Words the AI should prioritize when shaping pace, music, captions, and cuts.</p>
+                <p class="field-help">These tags change measurable editing decisions; the applied profile is shown with the rendered cut.</p>
                 <div class="token-input-shell" id="token-shell">
                   <div id="token-list"></div>
                   <input id="tone-token" type="text" placeholder="Type a token and press Enter" autocomplete="off" />
@@ -168,7 +177,7 @@
                   <button class="token-suggestion">Direct</button>
                 </div>
                 <div class="tone-effect" id="tone-effect">
-                  <span>Pace</span><i></i><span>Music</span><i></i><span>Captions</span><i></i><span>Cuts</span>
+                  <span>Pace</span><i></i><span>Shot length</span><i></i><span>Silence</span><i></i><span>Memes</span>
                 </div>
               </div>
 
@@ -212,6 +221,7 @@
                   <span class="cut-count" id="cut-count">0 cuts</span>
                 </div>
                 <p id="review-summary">Watch the rendered cut, then approve it or request a revision.</p>
+                <div class="cut-review-list" id="cut-review-list" aria-label="Cuts in this edit"></div>
                 <div class="review-actions">
                   <button class="primary-button" id="approve-cut" type="button">Approve cut</button>
                   <button class="secondary-button" id="request-changes" type="button">Needs changes</button>
@@ -222,18 +232,32 @@
                   <button class="secondary-button" id="render-revision" type="button">Render revision</button>
                 </div>
                 <div class="handoff-panel" id="handoff-panel" hidden>
-                  <label for="handoff-target">Continue with approved cut</label>
+                  <label for="export-format">Save the exact approved cut</label>
                   <div class="handoff-row">
-                    <select id="handoff-target">
-                      <option value="premiere">Adobe Premiere Pro XML</option>
-                      <option value="after-effects">After Effects script</option>
-                      <option value="youtube">YouTube publishing package</option>
-                      <option value="tiktok">TikTok publishing package</option>
-                      <option value="instagram">Instagram publishing package</option>
+                    <select id="export-format">
+                      <option value="mp4">MP4 · H.264/AAC</option>
+                      <option value="mov-prores">MOV · ProRes 422 HQ/PCM</option>
+                      <option value="webm">WebM · VP9/Opus</option>
                     </select>
-                    <button class="primary-button" id="create-handoff" type="button">Create handoff</button>
+                    <button class="primary-button" id="save-approved-format" type="button">Save format</button>
                   </div>
-                  <small id="handoff-status">Grayfox prepares the approved edit; you confirm the final import or post.</small>
+                  <small id="format-export-status">Choose a format; Grayfox saves the reviewed video without rebuilding its edit decisions.</small>
+                  <button class="secondary-button export-more-button" id="toggle-handoff-options" type="button" aria-expanded="false" aria-controls="handoff-secondary">Other destinations <span aria-hidden="true">＋</span></button>
+                  <div class="handoff-secondary" id="handoff-secondary" hidden>
+                    <div class="handoff-divider" aria-hidden="true"></div>
+                    <label for="handoff-target">Premiere, After Effects or social package</label>
+                    <div class="handoff-row">
+                      <select id="handoff-target">
+                        <option value="premiere">Adobe Premiere Pro XML</option>
+                        <option value="after-effects">After Effects script</option>
+                        <option value="youtube">YouTube publishing package</option>
+                        <option value="tiktok">TikTok publishing package</option>
+                        <option value="instagram">Instagram publishing package</option>
+                      </select>
+                      <button class="secondary-button" id="create-handoff" type="button">Create package</button>
+                    </div>
+                    <small id="handoff-status">Optional: Grayfox prepares the approved edit; you confirm the final import or post.</small>
+                  </div>
                 </div>
               </section>
               <p class="privacy-note">Video stays on this device. Dialogue analysis uses embedded subtitles or an available local speech recognizer; Grayfox reports the source it used.</p>
@@ -241,7 +265,7 @@
           </div>
         </section>
 
-        <section class="view" id="shorts">
+        <section class="view active" id="shorts">
           <div class="shorts-layout">
             <div class="shorts-intro">
               <span class="eyebrow">LOCAL VISION RANKING</span>
@@ -352,7 +376,7 @@
             <button class="secondary-button" id="choose-export-path" type="button">Choose folder</button>
           </div>
           <small class="selected-export-path" id="selected-export-path" hidden></small>
-          <small class="browser-folder-help" id="browser-folder-help" hidden>Browser preview: empty folders can also be entered manually.</small>
+          <small class="browser-folder-help" id="browser-folder-help" hidden></small>
         </div>
         <p class="modal-error" id="workspace-error" role="alert"></p>
         <button class="primary-button full" id="create-workspace" type="button">Start session</button>
@@ -360,7 +384,6 @@
       </section>
     </div>
 
-    <input type="file" id="browser-folder-input" webkitdirectory directory hidden />
     <input type="file" id="profile-image-input" accept="image/*" hidden />
     <div class="toast" id="toast" role="status"></div>
     <script src="./app.js"></script>

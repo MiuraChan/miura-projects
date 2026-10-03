@@ -8,9 +8,61 @@ function rangesOverlap(a, b, padding = 0) {
   return a.start < b.end + padding && a.end > b.start - padding;
 }
 
-function removeSilencesFromRange(range, silences, minimumSegment = 0.7) {
+function tonePacingProfile(tone = "") {
+  const normalized = String(tone || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, " ");
+  const energeticCues = [
+    "energetic", "energy", "fast", "punchy", "direct", "irreverent", "bold", "dynamic",
+    "energico", "energia", "rapido", "incalzante", "diretto", "irriverente", "audace", "dinamico",
+  ];
+  const measuredCues = [
+    "calm", "slow", "natural", "warm", "reflective", "intimate", "measured",
+    "calmo", "lento", "naturale", "caldo", "riflessivo", "intimo", "misurato",
+  ];
+  const energeticScore = energeticCues.filter((cue) => normalized.includes(cue)).length;
+  const measuredScore = measuredCues.filter((cue) => normalized.includes(cue)).length;
+
+  if (energeticScore > measuredScore) {
+    return {
+      id: "energetic-direct",
+      label: "Energetic / direct",
+      chapterSeconds: 90,
+      minimumSegment: 0.45,
+      minimumSilence: 0.28,
+      maximumSegments: 32,
+      shortMaximumSegments: 8,
+      memeThreshold: 68,
+    };
+  }
+  if (measuredScore > energeticScore) {
+    return {
+      id: "calm-measured",
+      label: "Calm / measured",
+      chapterSeconds: 300,
+      minimumSegment: 1.1,
+      minimumSilence: 0.9,
+      maximumSegments: 12,
+      shortMaximumSegments: 4,
+      memeThreshold: 88,
+    };
+  }
+  return {
+    id: "balanced",
+    label: "Balanced",
+    chapterSeconds: 180,
+    minimumSegment: 0.7,
+    minimumSilence: 0.45,
+    maximumSegments: 20,
+    shortMaximumSegments: 6,
+    memeThreshold: 78,
+  };
+}
+
+function removeSilencesFromRange(range, silences, minimumSegment = 0.7, minimumSilence = 0.45) {
   const relevant = silences
-    .filter((silence) => silence.end - silence.start >= 0.45)
+    .filter((silence) => silence.end - silence.start >= minimumSilence)
     .filter((silence) => rangesOverlap(range, silence))
     .sort((a, b) => a.start - b.start);
   const segments = [];
@@ -148,11 +200,16 @@ function assignRoles(segments) {
   }));
 }
 
-function buildLongFormSegments({ candidates, silences, sourceDuration, target, maximumSegments, excludedRanges = [] }) {
+function buildLongFormSegments({ candidates, silences, sourceDuration, target, maximumSegments, excludedRanges = [], toneProfile = tonePacingProfile("") }) {
   if (target >= sourceDuration - 0.05 && !excludedRanges.length) {
     return assignRoles([{ start: 0, end: sourceDuration, reason: "full-source-production" }]);
   }
 
+  const effectiveMaximumSegments = clamp(
+    Math.min(maximumSegments, Number(toneProfile.maximumSegments) || maximumSegments),
+    2,
+    maximumSegments,
+  );
   const ratio = target / sourceDuration;
   const strongest = [...candidates].sort((a, b) => b.score - a.score)[0];
   let segments;
@@ -160,7 +217,7 @@ function buildLongFormSegments({ candidates, silences, sourceDuration, target, m
     let removalBudget = sourceDuration - target;
     const removableSilences = silences
       .map((silence) => ({ start: silence.start + 0.08, end: silence.end - 0.08 }))
-      .filter((silence) => silence.end - silence.start >= 0.45)
+      .filter((silence) => silence.end - silence.start >= toneProfile.minimumSilence)
       .sort((a, b) => (b.end - b.start) - (a.end - a.start));
     const removals = [];
     for (const silence of removableSilences) {
@@ -183,7 +240,7 @@ function buildLongFormSegments({ candidates, silences, sourceDuration, target, m
     const selectionStart = clamp(anchorOffset - target * 0.15, 0, Math.max(0, contentDuration - target));
     segments = sliceSegmentsByContentTime(chronologicalContent, selectionStart, target);
   } else {
-    const chapterCount = clamp(Math.ceil(target / 300), 2, Math.min(12, maximumSegments));
+    const chapterCount = clamp(Math.ceil(target / toneProfile.chapterSeconds), 2, effectiveMaximumSegments);
     const chapterDuration = sourceDuration / chapterCount;
     const outputPerChapter = target / chapterCount;
     segments = Array.from({ length: chapterCount }, (_value, index) => {
@@ -200,8 +257,14 @@ function buildLongFormSegments({ candidates, silences, sourceDuration, target, m
   }
 
   segments = subtractRangesFromSegments(segments, excludedRanges);
+  segments = segments.flatMap((segment) => removeSilencesFromRange(
+    segment,
+    silences,
+    toneProfile.minimumSegment,
+    toneProfile.minimumSilence,
+  ));
   segments = fillSegmentsToDuration(segments, sourceDuration, target, excludedRanges);
-  if (!excludedRanges.length) segments = coalesceSegmentsToLimit(mergeRanges(segments), maximumSegments);
+  if (!excludedRanges.length) segments = coalesceSegmentsToLimit(mergeRanges(segments), effectiveMaximumSegments);
   segments = trimSegmentsToDuration(segments, target);
   return assignRoles(segments);
 }
@@ -224,39 +287,55 @@ function buildEditPlan({
   dialogueCues = [],
   sourceDuration,
   desiredDuration,
+  minimumDuration,
+  maximumDuration,
   direction = "",
   tone = "",
   maximumSegments = 48,
   excludedRanges = [],
 }) {
-  const target = clamp(Number(desiredDuration) || sourceDuration, 2, sourceDuration);
+  const toneProfile = tonePacingProfile(tone);
+  const requestedTarget = clamp(Number(desiredDuration) || sourceDuration, 2, sourceDuration);
+  const minimum = clamp(Number(minimumDuration) || requestedTarget, 2, sourceDuration);
+  const maximum = clamp(Number(maximumDuration) || requestedTarget, minimum, sourceDuration);
+  const target = clamp(requestedTarget, minimum, maximum);
   if (target > 120) {
-    const segments = buildLongFormSegments({ candidates, silences, sourceDuration, target, maximumSegments, excludedRanges });
+    const segments = buildLongFormSegments({ candidates, silences, sourceDuration, target, maximumSegments, excludedRanges, toneProfile });
     const outputDuration = segments.reduce((total, segment) => total + (segment.end - segment.start), 0);
     return {
       strategy: `Duration-locked ${tone ? `${tone} ` : ""}long-form production`,
+      toneProfile,
       segments,
       sourceDuration: Number(sourceDuration.toFixed(3)),
       requestedDuration: Number(target.toFixed(3)),
+      minimumDuration: Number(minimum.toFixed(3)),
+      maximumDuration: Number(maximum.toFixed(3)),
       outputDuration: Number(outputDuration.toFixed(3)),
       removedDuration: Number(Math.max(0, sourceDuration - outputDuration).toFixed(3)),
       reordered: false,
-      durationLocked: Math.abs(outputDuration - target) <= Math.max(1, target * 0.01),
+      durationLocked: outputDuration >= minimum - Math.max(1, minimum * 0.01)
+        && outputDuration <= maximum + Math.max(1, maximum * 0.01),
       excludedRanges: mergeRanges(excludedRanges),
       hardExclusionsApplied: excludedRanges.length > 0,
     };
   }
 
-  const ranked = [...candidates].sort((a, b) => b.score - a.score);
+  const ranked = [...candidates]
+    .sort((a, b) => b.score - a.score)
+    .flatMap((candidate) => subtractRangesFromSegments([candidate], excludedRanges))
+    .filter((candidate) => candidate.end - candidate.start >= 0.5);
   const selectedWindows = [];
-  const shortSegmentLimit = Math.min(8, maximumSegments);
+  const shortSegmentLimit = Math.min(toneProfile.shortMaximumSegments, maximumSegments);
   for (const candidate of ranked) {
     if (selectedWindows.some((selected) => rangesOverlap(selected, candidate, 0.35))) continue;
     selectedWindows.push(candidate);
     const selectedDuration = selectedWindows.reduce((total, item) => total + (item.end - item.start), 0);
     if (selectedDuration >= target * 1.35 || selectedWindows.length >= shortSegmentLimit) break;
   }
-  if (!selectedWindows.length) selectedWindows.push({ start: 0, end: Math.min(sourceDuration, target), score: 0 });
+  if (!selectedWindows.length) {
+    selectedWindows.push(...trimSegmentsToDuration(complementRanges(sourceDuration, excludedRanges), target)
+      .map((segment) => ({ ...segment, score: 0 })));
+  }
 
   const strongest = selectedWindows[0];
   const remaining = selectedWindows.slice(1).sort((a, b) => a.start - b.start);
@@ -272,25 +351,42 @@ function buildEditPlan({
   }
 
   const contentSegments = orderedWindows
-    .flatMap((window, windowIndex) => removeSilencesFromRange(window, silences).map((segment) => ({
+    .flatMap((window, windowIndex) => removeSilencesFromRange(
+      window,
+      silences,
+      toneProfile.minimumSegment,
+      toneProfile.minimumSilence,
+    ).map((segment) => ({
       ...segment,
       score: window.score,
       role: windowIndex === 0 ? "hook" : (windowIndex === orderedWindows.length - 1 ? "close" : "body"),
     })))
-    .filter((segment) => segment.end - segment.start >= 0.5);
-  let segments = trimSegmentsToDuration(contentSegments, target).slice(0, shortSegmentLimit);
-  if (preserveDialogue && dialogueCues.length) segments = protectDialogueBoundaries(segments, dialogueCues, sourceDuration);
+    .filter((segment) => segment.end - segment.start >= toneProfile.minimumSegment);
+  let segments = subtractRangesFromSegments(contentSegments, excludedRanges);
+  segments = trimSegmentsToDuration(segments, target).slice(0, shortSegmentLimit);
+  if (preserveDialogue && dialogueCues.length) {
+    segments = protectDialogueBoundaries(segments, dialogueCues, sourceDuration);
+    segments = subtractRangesFromSegments(segments, excludedRanges);
+  }
+  if (excludedRanges.length) segments = fillSegmentsToDuration(segments, sourceDuration, target, excludedRanges);
+  segments = assignRoles(trimSegmentsToDuration(segments, target));
   const outputDuration = segments.reduce((total, segment) => total + (segment.end - segment.start), 0);
   const coveredSpan = segments.length ? Math.max(...segments.map((segment) => segment.end)) - Math.min(...segments.map((segment) => segment.start)) : 0;
   return {
     strategy: `Direction-aware ${tone ? `${tone} ` : ""}multi-segment cut`,
+    toneProfile,
     segments,
     sourceDuration: Number(sourceDuration.toFixed(3)),
     requestedDuration: Number(target.toFixed(3)),
+    minimumDuration: Number(minimum.toFixed(3)),
+    maximumDuration: Number(maximum.toFixed(3)),
     outputDuration: Number(outputDuration.toFixed(3)),
     removedDuration: Number(Math.max(0, coveredSpan - outputDuration).toFixed(3)),
     reordered: segments.some((segment, index) => index > 0 && segment.start < segments[index - 1].start),
-    durationLocked: outputDuration >= target * 0.9,
+    durationLocked: outputDuration >= minimum - Math.max(1, minimum * 0.01)
+      && outputDuration <= maximum + Math.max(1, maximum * 0.01),
+    excludedRanges: mergeRanges(excludedRanges),
+    hardExclusionsApplied: excludedRanges.length > 0,
   };
 }
 
@@ -306,4 +402,5 @@ module.exports = {
   removeSilencesFromRange,
   sliceSegmentsByContentTime,
   trimSegmentsToDuration,
+  tonePacingProfile,
 };

@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
 import planner from "../electron/edit-planner.cjs";
 
-const { buildEditPlan, protectDialogueBoundaries, removeSilencesFromRange, trimSegmentsToDuration } = planner;
+const { buildEditPlan, protectDialogueBoundaries, removeSilencesFromRange, tonePacingProfile, trimSegmentsToDuration } = planner;
 
 describe("Grayfox multi-segment edit planner", () => {
+  it("turns the current serious, energetic, direct and irreverent tags into an energetic profile", () => {
+    expect(tonePacingProfile("Serious, Energetic, Direct, Irreverent")).toEqual(expect.objectContaining({
+      id: "energetic-direct",
+      label: "Energetic / direct",
+      chapterSeconds: 90,
+      memeThreshold: 68,
+    }));
+  });
+
   it("removes measured pauses while preserving content on both sides", () => {
     const segments = removeSilencesFromRange(
       { start: 0, end: 10 },
@@ -90,6 +99,55 @@ describe("Grayfox multi-segment edit planner", () => {
     expect(plan.segments.every((segment, index) => index === 0 || segment.start >= plan.segments[index - 1].end)).toBe(true);
   });
 
+  it("uses tone tags to produce measurably different long-form pacing", () => {
+    const request = {
+      candidates: [
+        { start: 100, end: 140, score: 70 },
+        { start: 900, end: 950, score: 96 },
+        { start: 1800, end: 1850, score: 84 },
+        { start: 2800, end: 2850, score: 88 },
+      ],
+      silences: [
+        { start: 115, end: 116 },
+        { start: 920, end: 920.5 },
+        { start: 1820, end: 1820.6 },
+        { start: 2820, end: 2821 },
+      ],
+      sourceDuration: 3600,
+      desiredDuration: 1200,
+      minimumDuration: 1200,
+      maximumDuration: 1200,
+      direction: "Keep the story",
+    };
+    const energetic = buildEditPlan({ ...request, tone: "Serious, Energetic, Direct, Irreverent" });
+    const calm = buildEditPlan({ ...request, tone: "Calm, warm, reflective" });
+    const averageLength = (plan) => plan.outputDuration / plan.segments.length;
+
+    expect(energetic.toneProfile.id).toBe("energetic-direct");
+    expect(calm.toneProfile.id).toBe("calm-measured");
+    expect(energetic.segments.length).toBeGreaterThan(calm.segments.length);
+    expect(averageLength(energetic)).toBeLessThan(averageLength(calm));
+    expect(energetic.outputDuration).toBeCloseTo(1200, 2);
+    expect(calm.outputDuration).toBeCloseTo(1200, 2);
+  });
+
+  it("keeps explicit minimum and maximum bounds in the edit plan", () => {
+    const plan = buildEditPlan({
+      candidates: [{ start: 20, end: 90, score: 96 }, { start: 180, end: 260, score: 88 }],
+      sourceDuration: 600,
+      desiredDuration: 300,
+      minimumDuration: 120,
+      maximumDuration: 300,
+      direction: "Keep the story",
+    });
+
+    expect(plan.minimumDuration).toBe(120);
+    expect(plan.maximumDuration).toBe(300);
+    expect(plan.outputDuration).toBeGreaterThanOrEqual(120);
+    expect(plan.outputDuration).toBeLessThanOrEqual(300);
+    expect(plan.durationLocked).toBe(true);
+  });
+
   it("never crosses hard exclusion ranges while filling a long target", () => {
     const plan = buildEditPlan({
       candidates: [
@@ -111,4 +169,24 @@ describe("Grayfox multi-segment edit planner", () => {
     expect(plan.segments.every((segment) =>
       plan.excludedRanges.every((range) => segment.end <= range.start || segment.start >= range.end)
     )).toBe(true);
-  });});
+  });
+
+  it("treats exclusions as hard constraints for short edits and duration fill", () => {
+    const plan = buildEditPlan({
+      candidates: [
+        { start: 60, end: 90, score: 99 },
+        { start: 300, end: 340, score: 92 },
+        { start: 380, end: 430, score: 88 },
+      ],
+      sourceDuration: 480,
+      desiredDuration: 120,
+      direction: "Remove the Starting Soon opening and keep direct-to-camera speech",
+      excludedRanges: [{ start: 0, end: 280, reason: "Starting Soon" }],
+    });
+
+    expect(plan.hardExclusionsApplied).toBe(true);
+    expect(plan.outputDuration).toBeCloseTo(120, 2);
+    expect(plan.segments.every((segment) => segment.start >= 280)).toBe(true);
+    expect(plan.segments.every((segment) => plan.excludedRanges.every((range) => !planner.rangesOverlap(segment, range)))).toBe(true);
+  });
+});

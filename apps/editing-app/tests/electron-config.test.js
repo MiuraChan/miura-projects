@@ -6,6 +6,7 @@ const bootstrapSource = fs.readFileSync(path.join(projectRoot, "electron", "boot
 const runtimeLoaderSource = fs.readFileSync(path.join(projectRoot, "electron", "runtime-loader.cjs"), "utf8");
 const preloadSource = fs.readFileSync(path.join(projectRoot, "electron", "preload.cjs"), "utf8");
 const stylesSource = fs.readFileSync(path.join(projectRoot, "styles.css"), "utf8");
+const localAiSource = fs.readFileSync(path.join(projectRoot, "electron", "local-ai.cjs"), "utf8");
 const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, "package.json"), "utf8"));
 const headerArtPath = path.join(projectRoot, "assets", "grayfox-header-v2.webp");
 
@@ -16,6 +17,9 @@ describe("Grayfox identity motion", () => {
     expect(stylesSource).not.toContain("grayfox-header-v2.webp");
     expect(stylesSource).toContain("@media (prefers-reduced-motion: reduce)");
     expect(stylesSource).toContain("animation: none !important");
+  });
+  it("centers the desktop shell and caps it at 1920 pixels", () => {
+    expect(stylesSource).toMatch(/\.app-shell\s*\{[^}]*width:\s*100%;[^}]*max-width:\s*1920px;[^}]*margin:\s*0 auto;/);
   });
 });
 describe("Electron production configuration", () => {
@@ -40,11 +44,14 @@ describe("Electron production configuration", () => {
     expect(mainSource).toContain('ipcMain.handle("workspace:save"');
     expect(mainSource).toContain('grayfox-workspace.json');
     expect(mainSource).toContain('cleanWorkspaceForStorage');
-    expect(mainSource).toContain('path: null');
+    expect(mainSource).toContain('path: project.source.path');
+    expect(mainSource).not.toContain('path: null,\n        size: 0');
     expect(mainSource).toContain('fs.writeFile');
     expect(preloadSource).toContain('ipcRenderer.invoke("workspace:choose-export-path")');
     expect(mainSource).toContain('ipcMain.handle("video:choose"');
     expect(mainSource).toContain('ipcMain.handle("video:restore"');
+    expect(mainSource).toContain('ipcMain.handle("video:find-near-export"');
+    expect(preloadSource).toContain('ipcRenderer.invoke("video:find-near-export", options)');
     expect(mainSource).toContain('ipcMain.handle("dialogue:choose"');
     expect(preloadSource).toContain('ipcRenderer.invoke("dialogue:choose"');
     expect(mainSource).toContain('ipcMain.handle("video:tools"');
@@ -54,8 +61,25 @@ describe("Electron production configuration", () => {
     expect(preloadSource).toContain('ipcRenderer.invoke("video:tools")');
     expect(preloadSource).toContain('ipcRenderer.invoke("video:produce", options)');
     expect(preloadSource).toContain('ipcRenderer.invoke("video:analyze", options)');
+    expect(mainSource).toContain('ipcMain.handle("meme:search"');
+    expect(preloadSource).toContain('ipcRenderer.invoke("meme:search", options)');
+    expect(mainSource).toContain("minimumMinutes");
+    expect(mainSource).toContain("maximumMinutes");
+    expect(mainSource).toContain("briefSignature");
+    expect(mainSource).toContain("toneProfile");
+    expect(localAiSource).toContain("editPlan.toneProfile?.memeThreshold");
+    expect(localAiSource).toContain("minimumDuration");
+    expect(localAiSource).toContain("maximumDuration");
     expect(mainSource).toContain('ipcMain.handle("video:handoff"');
     expect(preloadSource).toContain('ipcRenderer.invoke("video:handoff", options)');
+    expect(mainSource).toContain('ipcMain.handle("video:export-approved"');
+    expect(preloadSource).toContain('ipcRenderer.invoke("video:export-approved", options)');
+  });
+  it("can wake the installed LM Studio service before local vision inference", () => {
+    expect(localAiSource).toContain('path.join(process.env.USERPROFILE, ".lmstudio", "bin", executable)');
+    expect(localAiSource).toContain('["server", "start"]');
+    expect(localAiSource).toContain("ensureLmStudioServer(endpoint)");
+    expect(localAiSource).toContain("grayfox_meme_ranking");
   });
   it("packages the required renderer and Electron files", () => {
     expect(packageJson.main).toBe("electron/bootstrap.cjs");

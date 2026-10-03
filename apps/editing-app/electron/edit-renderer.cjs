@@ -24,7 +24,15 @@ function cleanSegments(rawSegments, fullDuration) {
     const memeEnabled = effect ? segment?.memeEnabled !== false : false;
     const memeStart = Math.min(Math.max(Number(segment?.memeStart) || start, start), end);
     const memeEnd = Math.min(Math.max(Number(segment?.memeEnd) || memeStart + 1.2, memeStart + 0.1), end);
-    return { start, end, role: String(segment?.role || "body").slice(0, 30), ...(effect ? { effect, memeEnabled, memeStart, memeEnd } : {}) };
+    const memeId = String(segment?.memeId || "").trim().slice(0, 80);
+    const memeLabel = String(segment?.memeLabel || "").trim().slice(0, 100);
+    const memeReason = String(segment?.memeReason || "").trim().slice(0, 300);
+    const memeMetadata = {
+      ...(memeId ? { memeId } : {}),
+      ...(memeLabel ? { memeLabel } : {}),
+      ...(memeReason ? { memeReason } : {}),
+    };
+    return { start, end, role: String(segment?.role || "body").slice(0, 30), ...(effect ? { effect, memeEnabled, memeStart, memeEnd, ...memeMetadata } : {}) };
   }).filter((segment) => segment.end - segment.start >= 0.05);
 }
 
@@ -110,13 +118,19 @@ function createEditRenderer({ resolveMediaTool, probeDuration, cleanText }) {
     const ffmpegPath = await resolveMediaTool("ffmpeg");
     const fullDuration = await probeDuration(sourcePath, ffprobePath);
     const segments = cleanSegments(payload?.segments, fullDuration);
-    if (segments.length < 2) throw new Error("A real edit needs at least two valid timeline segments.");
+    if (!segments.length) throw new Error("A real edit needs at least one valid timeline segment.");
 
     const requestedDuration = segments.reduce((total, segment) => total + (segment.end - segment.start), 0);
-    const expectedDuration = Math.min(fullDuration, Math.max(0, Number(payload?.expectedDuration) || 0));
-    const expectedTolerance = Math.max(2, expectedDuration * 0.03);
-    if (expectedDuration && requestedDuration < expectedDuration - expectedTolerance) {
-      throw new Error(`The edit plan covers only ${formatTimestamp(requestedDuration)} but ${formatTimestamp(expectedDuration)} was requested. Grayfox stopped instead of producing a misleading short file.`);
+    const legacyExpectedDuration = Math.max(0, Number(payload?.expectedDuration) || 0);
+    const minimumDuration = Math.min(fullDuration, Math.max(0, Number(payload?.minimumDuration) || legacyExpectedDuration));
+    const maximumDuration = Math.min(fullDuration, Math.max(minimumDuration, Number(payload?.maximumDuration) || legacyExpectedDuration));
+    const minimumTolerance = Math.max(2, minimumDuration * 0.03);
+    const maximumTolerance = Math.max(2, maximumDuration * 0.03);
+    if (minimumDuration && requestedDuration < minimumDuration - minimumTolerance) {
+      throw new Error(`The edit plan covers only ${formatTimestamp(requestedDuration)} but the minimum is ${formatTimestamp(minimumDuration)}. Grayfox stopped instead of producing a misleading short file.`);
+    }
+    if (maximumDuration && requestedDuration > maximumDuration + maximumTolerance) {
+      throw new Error(`The edit plan covers ${formatTimestamp(requestedDuration)} but the maximum is ${formatTimestamp(maximumDuration)}. Grayfox stopped before exceeding your limit.`);
     }
     const { stdout: audioStream } = await execFileAsync(ffprobePath, [
       "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=index", "-of", "csv=p=0", sourcePath,
@@ -206,17 +220,22 @@ function createEditRenderer({ resolveMediaTool, probeDuration, cleanText }) {
       if (!Number.isFinite(duration) || duration < 0.05 || outputStat.size < 1024) {
         throw new Error("Grayfox rendered an empty file. The selected source sections may be damaged.");
       }
-      const meetsTarget = !expectedDuration || duration >= expectedDuration - expectedTolerance;
+      const meetsTarget = (!minimumDuration || duration >= minimumDuration - minimumTolerance)
+        && (!maximumDuration || duration <= maximumDuration + maximumTolerance);
       const durationWarning = meetsTarget
         ? null
-        : `Rendered ${formatTimestamp(duration)} of the requested ${formatTimestamp(expectedDuration)} because ${skippedSegments.length} source section${skippedSegments.length === 1 ? " was" : "s were"} unreadable.`;
+        : (duration < minimumDuration
+          ? `Rendered ${formatTimestamp(duration)}, below the ${formatTimestamp(minimumDuration)} minimum, because ${skippedSegments.length} source section${skippedSegments.length === 1 ? " was" : "s were"} unreadable.`
+          : `Rendered ${formatTimestamp(duration)}, above the ${formatTimestamp(maximumDuration)} maximum.`);
       event.sender.send("video:production-progress", { percent: 100, outputPath, phase: "multi-segment-edit" });
       return {
         outputPath,
         duration,
         segmentCount: rendered.length,
         requestedSegmentCount: segments.length,
-        targetDuration: expectedDuration || requestedDuration,
+        targetDuration: maximumDuration || minimumDuration || requestedDuration,
+        minimumDuration,
+        maximumDuration,
         meetsTarget,
         durationWarning,
         segments: rendered.map(({ path: _path, duration: _duration, requestedIndex: _requestedIndex, ...segment }) => segment),

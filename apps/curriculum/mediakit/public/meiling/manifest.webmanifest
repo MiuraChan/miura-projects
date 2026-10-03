@@ -1,0 +1,17 @@
+{
+  "name": "Mei Ling Codec",
+  "short_name": "Codec",
+  "description": "Miura's creator strategy codec.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#010302",
+  "theme_color": "#010302",
+  "icons": [
+    {
+      "src": "./mei-codec-ps1.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

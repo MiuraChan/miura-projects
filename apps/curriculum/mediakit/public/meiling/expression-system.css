@@ -1,0 +1,21 @@
+.portrait--mei .portrait__image {
+  transition: opacity 130ms steps(2, end), filter 130ms steps(2, end);
+}
+
+.portrait--mei.is-changing-expression .portrait__image {
+  opacity: 0.16;
+  filter: brightness(1.8) contrast(1.25);
+}
+
+.portrait--mei[data-expression="angry"] {
+  box-shadow:
+    0 0 5px #b0e6d5,
+    0 0 18px rgba(84, 178, 145, 0.52),
+    inset 0 0 12px #000;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portrait--mei .portrait__image {
+    transition: none;
+  }
+}

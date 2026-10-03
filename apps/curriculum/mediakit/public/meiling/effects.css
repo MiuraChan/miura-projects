@@ -1,0 +1,119 @@
+.codec.is-appearing .radio {
+  animation: radio-arrival 720ms steps(5, end) both;
+}
+
+.codec.is-appearing .portrait--mei {
+  animation: mei-arrival 1050ms 420ms steps(7, end) both;
+}
+
+.codec.is-appearing .portrait--miura {
+  animation: miura-arrival 1050ms 620ms steps(7, end) both;
+}
+
+.codec.is-appearing .scanlines {
+  animation: phosphor-lock 1550ms steps(9, end) both;
+}
+
+.codec.is-appearing::before {
+  position: absolute;
+  inset: 5% 0;
+  z-index: 20;
+  pointer-events: none;
+  content: "";
+  background: linear-gradient(
+    to bottom,
+    transparent 0,
+    rgba(159, 244, 211, 0.22) 49.5%,
+    rgba(206, 255, 238, 0.62) 50%,
+    transparent 51%
+  );
+  animation: codec-scan 1250ms steps(10, end) both;
+}
+
+.codec.is-ringing {
+  cursor: pointer;
+}
+
+.codec.is-ringing .radio {
+  box-shadow:
+    0 0 6px #b0e6d5,
+    0 0 18px rgba(84, 178, 145, 0.48),
+    inset 0 0 8px #000;
+}
+
+@keyframes radio-arrival {
+  0% {
+    opacity: 0;
+    transform: scaleX(0.02);
+    filter: brightness(2.2);
+  }
+  55% {
+    opacity: 1;
+    transform: scaleX(1.04);
+    filter: brightness(1.55);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleX(1);
+    filter: none;
+  }
+}
+
+@keyframes mei-arrival {
+  0% {
+    opacity: 0;
+    clip-path: inset(0 0 0 100%);
+    transform: translateX(16px);
+    filter: brightness(2);
+  }
+  62% {
+    opacity: 0.82;
+    clip-path: inset(0);
+    transform: translateX(-2px);
+  }
+  100% {
+    opacity: 1;
+    clip-path: inset(0);
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes miura-arrival {
+  0% {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+    transform: translateX(-16px);
+    filter: brightness(2);
+  }
+  62% {
+    opacity: 0.82;
+    clip-path: inset(0);
+    transform: translateX(2px);
+  }
+  100% {
+    opacity: 1;
+    clip-path: inset(0);
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes phosphor-lock {
+  0%, 18%, 42% { opacity: 0.18; }
+  9%, 30%, 58% { opacity: 1; }
+  100% { opacity: 0.75; }
+}
+
+@keyframes codec-scan {
+  0% { opacity: 0; transform: translateY(-55%); }
+  18% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(55%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .codec.is-appearing *,
+  .codec.is-appearing::before {
+    animation: none !important;
+  }
+}

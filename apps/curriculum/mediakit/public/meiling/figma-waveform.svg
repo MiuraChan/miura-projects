@@ -1,0 +1,9 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="484" height="120" viewBox="0 0 484 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Voice waveform / Active">
+<path id="Vector" d="M0 60H38L50 45L63 78L77 22L90 92L105 52L121 65L137 42L151 75L168 12L184 105L201 48L220 67L240 31L258 86L276 49L294 70L309 20L325 100L342 45L358 75L375 54L392 62L410 39L425 79L442 50L456 66L470 60H484" stroke="#59EB99" stroke-width="4"/>
+<g id="Vector_2" opacity="0.7">
+<path d="M0 60H484Z" fill="black"/>
+<path d="M0 60H484" stroke="#1A5233"/>
+</g>
+</g>
+</svg>

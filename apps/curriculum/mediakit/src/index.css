@@ -1,0 +1,131 @@
+@import 'tailwindcss';
+
+@font-face {
+  font-family: 'Archivo:ExtraBold';
+  font-style: normal;
+  font-weight: 800;
+  src: url('https://static.figma.com/font/Archivo_wdth_wght__1') format('woff2');
+}
+
+@font-face {
+  font-family: 'Archivo:Bold';
+  font-style: normal;
+  font-weight: 700;
+  src: url('https://static.figma.com/font/Archivo_wdth_wght__1') format('woff2');
+}
+
+@font-face {
+  font-family: 'Archivo:SemiBold';
+  font-style: normal;
+  font-weight: 600;
+  src: url('https://static.figma.com/font/Archivo_wdth_wght__1') format('woff2');
+}
+
+@font-face {
+  font-family: 'Archivo:Medium';
+  font-style: normal;
+  font-weight: 500;
+  src: url('https://static.figma.com/font/Archivo_wdth_wght__1') format('woff2');
+}
+
+@font-face {
+  font-family: 'Archivo:Regular';
+  font-style: normal;
+  font-weight: 400;
+  src: url('https://static.figma.com/font/Archivo_wdth_wght__1') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono:SemiBold';
+  font-style: normal;
+  font-weight: 600;
+  src: url('https://static.figma.com/font/IBMPlexMono-SemiBold_3') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono:Medium';
+  font-style: normal;
+  font-weight: 500;
+  src: url('https://static.figma.com/font/IBMPlexMono-Medium_3') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono:Regular';
+  font-style: normal;
+  font-weight: 400;
+  src: url('https://static.figma.com/font/IBMPlexMono-Regular_2') format('woff2');
+}
+
+.miura-monkey-walk {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.miura-monkey-walk__sprite {
+  position: absolute;
+  display: block;
+  max-width: none;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .miura-monkey-walk__sprite { animation: none !important; }
+}
+@media (max-width: 900px) {
+
+}
+
+.cover-title {
+  overflow: visible;
+}
+
+.cover-type-line {
+  display: block;
+  width: max-content;
+  max-width: none;
+  overflow: hidden;
+  padding-right: .12em;
+  white-space: nowrap;
+  box-sizing: content-box;
+}
+
+.cover-type-line--one { animation: cover-reveal 560ms steps(6, end) 160ms both; }
+.cover-type-line--two { animation: cover-reveal 920ms steps(13, end) 780ms both; }
+.cover-type-line--three { animation: cover-reveal 790ms steps(11, end) 1.8s both; }
+
+.cover-caret {
+  display: inline-block;
+  height: .72em;
+  margin-left: .06em;
+  border-right: .075em solid #ff4b1f;
+  vertical-align: -.05em;
+  animation: cover-caret-blink 760ms step-end 2.6s infinite;
+}
+
+@keyframes cover-reveal {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
+@keyframes cover-caret-blink {
+  50% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cover-type-line { animation: none; }
+  .cover-caret { animation: none; }
+}
+
+@keyframes miura-bubble-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [style*="miura-bubble-in"] { animation: none !important; }
+}
+

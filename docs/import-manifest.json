@@ -1,0 +1,1350 @@
+{
+  "importedOn": "2026-10-03",
+  "destination": "D:/00_miura/03_development/miura-projects",
+  "sources": [
+    {
+      "project": "grayfox",
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio",
+      "prefix": "apps/editing-app",
+      "head": "0742a875b7ba6cf5a2d890c2ff19f3475b0ad936",
+      "branch": "agent/refine-dialogue-review-handoffs",
+      "sourceStatusBefore": "M .gitignore\n M app.js\n M electron/edit-planner.cjs\n M electron/edit-renderer.cjs\n M electron/local-ai.cjs\n M electron/main.cjs\n M electron/preload.cjs\n M index.html\n M package.json\n M scripts/edit-integration.cjs\n M styles.css\n M tests/app.test.js\n M tests/edit-planner.test.js\n M tests/electron-config.test.js\n M tests/local-ai.test.js\n?? BUG-LOG.md\n?? electron/format-exporter.cjs\n?? scripts/apply-storytelling-test-brief.cjs\n?? scripts/format-integration.cjs\n?? scripts/preview-integration.cjs\n?? scripts/real-vod-e2e.cjs\n?? tests/format-exporter.test.js"
+    },
+    {
+      "project": "mei",
+      "source": "C:/Users/miura/Documents/mei ling",
+      "prefix": "apps/mei-ling",
+      "head": "33a32b5e601f18f03938acab3c5bc8a6d477f49d",
+      "branch": "main",
+      "sourceStatusBefore": "M .gitignore\n M brain/briefing.mjs\n M brain/briefing.test.mjs\n M brain/db.mjs\n M brain/db.test.mjs\n M brain/instructions.mjs\n M brain/instructions.test.mjs\n M brain/scheduler.mjs\n M brain/scheduler.test.mjs\n M brain/source-catalog.mjs\n M local_stt.py\n M local_voice.py\n M package.json\n M public/app.js\n M public/conversation.css\n M public/index.html\n M public/manifest.webmanifest\n M public/panels.css\n M public/service-worker.js\n M public/styles.css\n M server.mjs\n M start.mjs\n?? .deploy/\n?? .dockerignore\n?? .env.demo.example\n?? .firebaserc.example\n?? Dockerfile\n?? brain/desktop-startup.test.mjs\n?? brain/external-link.test.mjs\n?? brain/gemini-client.mjs\n?? brain/gemini-client.test.mjs\n?? brain/grounded-news.mjs\n?? brain/live-search.mjs\n?? brain/live-search.test.mjs\n?? brain/news-result-ui.test.mjs\n?? brain/public-demo.test.mjs\n?? brain/runtime-readiness.test.mjs\n?? brain/server.test.mjs\n?? brain/system-ca.test.mjs\n?? brain/turn-detector.test.mjs\n?? brain/voice-input.test.mjs\n?? brain/voice-owner.test.mjs\n?? brain/wake-word.test.mjs\n?? desktop/\n?? docs/\n?? electron-builder.config.cjs\n?? firebase.json\n?? package-lock.json\n?? packaging/\n?? public/firebase-ai-client.js\n?? public/news-result.js\n?? public/runtime-readiness.js\n?? public/turn-detector.js\n?? public/voice-input.js\n?? public/voice-owner.js\n?? public/wake-word.js\n?? test_local_stt.py\n?? test_local_voice.py"
+    }
+  ],
+  "files": [
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/BUG-LOG.md",
+      "destination": "apps/editing-app/BUG-LOG.md",
+      "bytes": 1727,
+      "sha256": "44671756a799ca2f55fed05bc23f89b90cc9402ba0da819e3737c9e6ef5908e8"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/electron/format-exporter.cjs",
+      "destination": "apps/editing-app/electron/format-exporter.cjs",
+      "bytes": 4093,
+      "sha256": "f7ae56f511b2526db0a79fb60f87c2b0fb594ea300d97d0af601643ad6f24887"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/scripts/apply-storytelling-test-brief.cjs",
+      "destination": "apps/editing-app/scripts/apply-storytelling-test-brief.cjs",
+      "bytes": 2431,
+      "sha256": "d9ee6d03441dc114a031ddb87fc99458213e9fc055d0e5063bff5e90112af49f"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/scripts/format-integration.cjs",
+      "destination": "apps/editing-app/scripts/format-integration.cjs",
+      "bytes": 3073,
+      "sha256": "f2e9f46220df281e1e0769e51d638e0d1204a2545fb3513ed214ee9bf7b41849"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/scripts/preview-integration.cjs",
+      "destination": "apps/editing-app/scripts/preview-integration.cjs",
+      "bytes": 1715,
+      "sha256": "9010ee7647cfcf8b51fbc81de54d03856b708e595e33d9dcd23e8996db4cae3d"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/scripts/real-vod-e2e.cjs",
+      "destination": "apps/editing-app/scripts/real-vod-e2e.cjs",
+      "bytes": 7147,
+      "sha256": "9eb92d1d9c7e4267c2ca502c4fb3ac733eb1f56d93e5a9b27c10be4ae8b25f57"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/tests/format-exporter.test.js",
+      "destination": "apps/editing-app/tests/format-exporter.test.js",
+      "bytes": 680,
+      "sha256": "fe70d4e3641a1cb20dd56111ca4ec7739a2b8d33b698e52e890d37063e4d5350"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/.gitignore",
+      "destination": "apps/editing-app/.gitignore",
+      "bytes": 70,
+      "sha256": "571c27178ddccca9c4f44373fbaa660b859506a342d75a0a7f72d3bfc98ab4f8"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/GRAYFOX-CODEX-SPEC.md",
+      "destination": "apps/editing-app/GRAYFOX-CODEX-SPEC.md",
+      "bytes": 1206,
+      "sha256": "e6b3f792b1b292978cc8c194e6e22694ead47cb4a273b2006cac010a2c7c6c4d"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/README.md",
+      "destination": "apps/editing-app/README.md",
+      "bytes": 4119,
+      "sha256": "7fc7bcfae7b21dce2be96b15c954e916ecb336549f5a807468464b7590ba902a"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/VERSIONS.md",
+      "destination": "apps/editing-app/VERSIONS.md",
+      "bytes": 4338,
+      "sha256": "56aa5a6fd3e367e3e0fd751666143aee51c33acc66b8891e54aaf9a55ea73aa7"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/app.js",
+      "destination": "apps/editing-app/app.js",
+      "bytes": 93323,
+      "sha256": "e1753951e14dbc9ff5360902cfc588ab298442e0f8f08f1f392369c9bfe16577"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/assets/story-clips.png",
+      "destination": "apps/editing-app/assets/story-clips.png",
+      "bytes": 352358,
+      "sha256": "deec3c339ae80027d049f8bdb1a90284e47056cad02b7bce147d0e448398dd1d"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/assets/video-ops.png",
+      "destination": "apps/editing-app/assets/video-ops.png",
+      "bytes": 117564,
+      "sha256": "29af6474addfc0d6c3283143a40aebe8d29ebd17405daf70f76b849bf875c25d"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/electron/bootstrap.cjs",
+      "destination": "apps/editing-app/electron/bootstrap.cjs",
+      "bytes": 1095,
+      "sha256": "dc96cb7775ddda1b60471916964f07227eb7171aef79e328ef7473b8ef786035"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/electron/edit-planner.cjs",
+      "destination": "apps/editing-app/electron/edit-planner.cjs",
+      "bytes": 17257,
+      "sha256": "30e8369487aec5deb1e687dfd3ec0c4352f0ff242076c25490b90be9ad371b5b"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/electron/edit-renderer.cjs",
+      "destination": "apps/editing-app/electron/edit-renderer.cjs",
+      "bytes": 13022,
+      "sha256": "150c56ae78ddabbc619585ae5b0828eaee60938c3787c97ce0ec03a6a2a7cba0"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/electron/handoff.cjs",
+      "destination": "apps/editing-app/electron/handoff.cjs",
+      "bytes": 9609,
+      "sha256": "a9b52ccb75e02c7b2f60a45a80545faf4c2b6e7a3e879f4f37f31030b01d97e5"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/electron/local-ai.cjs",
+      "destination": "apps/editing-app/electron/local-ai.cjs",
+      "bytes": 47536,
+      "sha256": "95c8c27d7b67482200aa36e4919ab6f13f4268ff0e30668155809ceff49a90d5"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/electron/main.cjs",
+      "destination": "apps/editing-app/electron/main.cjs",
+      "bytes": 18839,
+      "sha256": "893189755701e14281ec5e8b538ab42c7546e79b751f019bff1ebdde96699b06"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/electron/preload.cjs",
+      "destination": "apps/editing-app/electron/preload.cjs",
+      "bytes": 1728,
+      "sha256": "9607fd0cb99813f1c0f4a9200b620fd7e95001aec6d6368b944c033d8c8813f0"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/electron/runtime-loader.cjs",
+      "destination": "apps/editing-app/electron/runtime-loader.cjs",
+      "bytes": 3236,
+      "sha256": "6007465546a9250adf604931b5ff37166d8e011062ec1747cd254a2382c4d15c"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/index.html",
+      "destination": "apps/editing-app/index.html",
+      "bytes": 23662,
+      "sha256": "6b685291b523fc707e0231235183214bb27ae2261125d900574738c7c51d7e1b"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/package-lock.json",
+      "destination": "apps/editing-app/package-lock.json",
+      "bytes": 229859,
+      "sha256": "844af6b7ed75e5be980e86f9ab333f42e478889b49a889b1cf312918421a1ed2"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/package.json",
+      "destination": "apps/editing-app/package.json",
+      "bytes": 1983,
+      "sha256": "47c4fe02eee9a78e870982f51d031d7e23df3737ec5f21e037876d1bd863af99"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/scripts/deploy-local-update.cjs",
+      "destination": "apps/editing-app/scripts/deploy-local-update.cjs",
+      "bytes": 3523,
+      "sha256": "7378d8ef93baedc1b846c07cd5facc07ea4c436c4a5c27f29818ca5afabbf5c5"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/scripts/direction-audit.cjs",
+      "destination": "apps/editing-app/scripts/direction-audit.cjs",
+      "bytes": 2820,
+      "sha256": "9a1f0161b78bb7d5f8bdf25641a5c3a1c0e29531c15eb6697d5120890dd33362"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/scripts/edit-integration.cjs",
+      "destination": "apps/editing-app/scripts/edit-integration.cjs",
+      "bytes": 6547,
+      "sha256": "6edb3375369061edad351971c10cac8def723c84c5a0c6bb9c87bdaa3ef77434"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/scripts/edit-resilience-integration.cjs",
+      "destination": "apps/editing-app/scripts/edit-resilience-integration.cjs",
+      "bytes": 5495,
+      "sha256": "a618656baceeead2d290f5d82effd0a78b1ec4d0c9c0f82625d5b193eb55d57a"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/scripts/electron-smoke.cjs",
+      "destination": "apps/editing-app/scripts/electron-smoke.cjs",
+      "bytes": 918,
+      "sha256": "7ac943d30d116aa4c6b4fff1eb6cfe4ea8b33c8e942928c46ec7a150c51dccac"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/scripts/ffmpeg-integration.cjs",
+      "destination": "apps/editing-app/scripts/ffmpeg-integration.cjs",
+      "bytes": 3659,
+      "sha256": "a245b16a9f0881768b25b36275d36fa0f02a509bc8654d9bbe4409806ade7566"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/scripts/local-ai-integration.cjs",
+      "destination": "apps/editing-app/scripts/local-ai-integration.cjs",
+      "bytes": 3526,
+      "sha256": "27fb8eddd89f48defa253511c448e9246f57e16ff376dd9c57bffe1d388db1bf"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/scripts/preview-server.cjs",
+      "destination": "apps/editing-app/scripts/preview-server.cjs",
+      "bytes": 1391,
+      "sha256": "9dcfd470f01894a6d0ed4f6ee2234a0141c33aaea81aafc542b82a4c79192c37"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/scripts/rollback-local-update.cjs",
+      "destination": "apps/editing-app/scripts/rollback-local-update.cjs",
+      "bytes": 1451,
+      "sha256": "69a44489bfa8872802faa00f8cd3755839cd94e17d19945020c5210ac34fa9cd"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/styles.css",
+      "destination": "apps/editing-app/styles.css",
+      "bytes": 39217,
+      "sha256": "49e5802d1d295851d802b229827b1b068d101adc6a455da1559f4e5097408f53"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/tests/app.test.js",
+      "destination": "apps/editing-app/tests/app.test.js",
+      "bytes": 74572,
+      "sha256": "a9325648b46a5c0e78822626835cf89ca215ef4fee625c1e88bb1024639d6390"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/tests/edit-planner.test.js",
+      "destination": "apps/editing-app/tests/edit-planner.test.js",
+      "bytes": 7283,
+      "sha256": "dbf4c43dc6f6e3feaab9e042dbf02ff00d290b32737ac1451f7cb6ee233b2323"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/tests/edit-renderer.test.js",
+      "destination": "apps/editing-app/tests/edit-renderer.test.js",
+      "bytes": 2862,
+      "sha256": "89b942799201d80d93e34e0656c05f126ac25cc32e6196f79261614b2f772aa0"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/tests/electron-config.test.js",
+      "destination": "apps/editing-app/tests/electron-config.test.js",
+      "bytes": 5939,
+      "sha256": "24ef5876a5d47666e12b9cef9bddee84ef7f5702bfd32ab7909948614f471288"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/tests/handoff.test.js",
+      "destination": "apps/editing-app/tests/handoff.test.js",
+      "bytes": 3135,
+      "sha256": "d4cab287b9f201b4e6508918f58d1a52d9fb452cfbbb854ea7b4534c6b5a0a13"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/tests/local-ai.test.js",
+      "destination": "apps/editing-app/tests/local-ai.test.js",
+      "bytes": 10609,
+      "sha256": "00b4f5caadd8e03702914291626496f61d970232d3207a6dc68d60f46bb31028"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/tests/runtime-loader.test.js",
+      "destination": "apps/editing-app/tests/runtime-loader.test.js",
+      "bytes": 2854,
+      "sha256": "ed6f843be5df93a51789d845a5e116804e048c5771d36bb29cdf4f03881232c1"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-07-24/we/outputs/video-studio/vitest.config.mjs",
+      "destination": "apps/editing-app/vitest.config.mjs",
+      "bytes": 404,
+      "sha256": "eeeda3415c28163960bab55fd28bd38764af5e3cb415d9024207536d8500c174"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/.dockerignore",
+      "destination": "apps/mei-ling/.dockerignore",
+      "bytes": 112,
+      "sha256": "ea1f2ba4a0549b567eb809b8b768ab730e915e177d0d6a339673fce99701bd60"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/.env.demo.example",
+      "destination": "apps/mei-ling/.env.demo.example",
+      "bytes": 306,
+      "sha256": "8b0e3a6ae65efd5df860c55f69f9b63d77ef8bc9257d4d4143a00079c86bd270"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/.firebaserc.example",
+      "destination": "apps/mei-ling/.firebaserc.example",
+      "bytes": 71,
+      "sha256": "a39333dffa0e93582ffa6e39b12a6c25da4beda4e212589ccd8d7212c336e272"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/Dockerfile",
+      "destination": "apps/mei-ling/Dockerfile",
+      "bytes": 406,
+      "sha256": "ff63c025b6e7b38ada6d41d791505910a9d886563bff2257559ba4c142b04e5e"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/desktop-startup.test.mjs",
+      "destination": "apps/mei-ling/brain/desktop-startup.test.mjs",
+      "bytes": 6015,
+      "sha256": "1bdb819587d99259cf1acf1b38f2a91b24aa7352def0d68755d6fb87f2348c1f"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/external-link.test.mjs",
+      "destination": "apps/mei-ling/brain/external-link.test.mjs",
+      "bytes": 968,
+      "sha256": "fa68d894f45b6a06664e7fcf1d4288ccdd818f727674de375a61aa19e9c214ca"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/gemini-client.mjs",
+      "destination": "apps/mei-ling/brain/gemini-client.mjs",
+      "bytes": 3375,
+      "sha256": "892f1bee26559424c8a12ade79d716c970e7e7fcee461620196e3f2380ca4722"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/gemini-client.test.mjs",
+      "destination": "apps/mei-ling/brain/gemini-client.test.mjs",
+      "bytes": 2078,
+      "sha256": "bc158029edde69ef027b6ce247436773e21a602d7734e120714eecc2455b08e7"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/grounded-news.mjs",
+      "destination": "apps/mei-ling/brain/grounded-news.mjs",
+      "bytes": 5855,
+      "sha256": "fe728fe0d14a02afc3772aa62839cfeade57f8c4b0c1a1263d37f35d1291315e"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/live-search.mjs",
+      "destination": "apps/mei-ling/brain/live-search.mjs",
+      "bytes": 22402,
+      "sha256": "49bcda53f97828de169ab4927a534425d9bee1908b3403510b242909776fccca"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/live-search.test.mjs",
+      "destination": "apps/mei-ling/brain/live-search.test.mjs",
+      "bytes": 12834,
+      "sha256": "87c9857ed64daad4e7a362e0cf55c78c489f0ee9190d31e1e8cb342a22060201"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/news-result-ui.test.mjs",
+      "destination": "apps/mei-ling/brain/news-result-ui.test.mjs",
+      "bytes": 2750,
+      "sha256": "a38edc0b670bf8f94a1f4bb9306f411b54034457badc0d58b70879d2acc47e70"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/public-demo.test.mjs",
+      "destination": "apps/mei-ling/brain/public-demo.test.mjs",
+      "bytes": 4095,
+      "sha256": "50af501be59f0cb77ce136f9f1d3776b2c6b0e3d8e4914ed406166fe804af2ad"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/runtime-readiness.test.mjs",
+      "destination": "apps/mei-ling/brain/runtime-readiness.test.mjs",
+      "bytes": 1243,
+      "sha256": "1bdfd32827265ae0153c364319dc0c4cdf2e8c25819bb3120aa11185841e81aa"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/server.test.mjs",
+      "destination": "apps/mei-ling/brain/server.test.mjs",
+      "bytes": 42148,
+      "sha256": "43e6948bffc0e208a0eb8479c3b4bd034719187dcd10a4ea1d6b9f044f485706"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/system-ca.test.mjs",
+      "destination": "apps/mei-ling/brain/system-ca.test.mjs",
+      "bytes": 1208,
+      "sha256": "ea97920a7510f284f313fc11fea7af45a1038e0199a902ed8a91ba2a91b92b7f"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/turn-detector.test.mjs",
+      "destination": "apps/mei-ling/brain/turn-detector.test.mjs",
+      "bytes": 3564,
+      "sha256": "fc41a6c9ba41821db046462fc029acd1185ef2de959d6838795aa4785ad5e0c2"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/voice-input.test.mjs",
+      "destination": "apps/mei-ling/brain/voice-input.test.mjs",
+      "bytes": 2187,
+      "sha256": "f62865a3d73d20054f2b7376b0dd6bb736c86dfa6762e571839f1e6830b2d7b0"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/voice-owner.test.mjs",
+      "destination": "apps/mei-ling/brain/voice-owner.test.mjs",
+      "bytes": 5976,
+      "sha256": "eaf229bb27958cd81afccda5b89086e27fc1e237b491ef67f4252427309ef934"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/wake-word.test.mjs",
+      "destination": "apps/mei-ling/brain/wake-word.test.mjs",
+      "bytes": 1230,
+      "sha256": "4632cbd3700c5d0e18d5e0cb8ec1ea3c7dbcea49601dd2f7bc799c84758246c3"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/desktop/external-link.cjs",
+      "destination": "apps/mei-ling/desktop/external-link.cjs",
+      "bytes": 810,
+      "sha256": "f6d52f499d7ca5ac242b667c3620d159965b05d93b225ffdaf93f00de351473c"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/desktop/loading.html",
+      "destination": "apps/mei-ling/desktop/loading.html",
+      "bytes": 1657,
+      "sha256": "daeda01252c5ba7308d7787ab9368efeb70224f26924d4577ee35fb6c2168bad"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/desktop/main-v12.cjs",
+      "destination": "apps/mei-ling/desktop/main-v12.cjs",
+      "bytes": 957,
+      "sha256": "0e0eaf21382d279663fdb93170ebaa0bbaaed8a3c6b610b8963c1b77cb407555"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/desktop/main.cjs",
+      "destination": "apps/mei-ling/desktop/main.cjs",
+      "bytes": 10767,
+      "sha256": "26120bf9d7d9544e8f381f0402bd0d052b4e3dbc22fdcceeabefa35c0c0ef8aa"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/desktop/startup-readiness.cjs",
+      "destination": "apps/mei-ling/desktop/startup-readiness.cjs",
+      "bytes": 3493,
+      "sha256": "7736305d4f682733972cd9358b21e8cb58d779775178c34d0a95fc7d203c1aca"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/desktop/system-ca.cjs",
+      "destination": "apps/mei-ling/desktop/system-ca.cjs",
+      "bytes": 536,
+      "sha256": "97578b78124f794729e6b96459e88a982471fe1eb0b0a7835708ea9222f89536"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/docs/PRODUCTION_READINESS_2026-08-10.md",
+      "destination": "apps/mei-ling/docs/PRODUCTION_READINESS_2026-08-10.md",
+      "bytes": 7254,
+      "sha256": "8b4cfe11aae05fba80886271a209e1bbcce39a327f22dfef66064c8dcde0d320"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/docs/PUBLIC_WEB_DEMO_DEPLOYMENT.md",
+      "destination": "apps/mei-ling/docs/PUBLIC_WEB_DEMO_DEPLOYMENT.md",
+      "bytes": 4069,
+      "sha256": "d9b71e3daea31f273e823da5848c92810273960d9153047aa7aca46392b71ba5"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/docs/ZERO_COST_LAUNCH_PLAN.md",
+      "destination": "apps/mei-ling/docs/ZERO_COST_LAUNCH_PLAN.md",
+      "bytes": 4701,
+      "sha256": "d3faca677f49a176a6cb22cd1fbcbf7a1cbfeb009bc6c2ede58029c7c2ac89e4"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/electron-builder.config.cjs",
+      "destination": "apps/mei-ling/electron-builder.config.cjs",
+      "bytes": 678,
+      "sha256": "fbc7d319db229532d677daa651b7a7b7e9b4b30ac07cd2495642ae5f54975077"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/firebase.json",
+      "destination": "apps/mei-ling/firebase.json",
+      "bytes": 908,
+      "sha256": "298183fbe87c6208fd5d197cffbd5f8ae036b396d92df82122df092c75f2b05c"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/package-lock.json",
+      "destination": "apps/mei-ling/package-lock.json",
+      "bytes": 127431,
+      "sha256": "1a07466dfc876fd810595c28b34f526087bf45d0112a3a88ce16b2c6a5a1e34f"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/packaging/build-llama-launcher.ps1",
+      "destination": "apps/mei-ling/packaging/build-llama-launcher.ps1",
+      "bytes": 2672,
+      "sha256": "e56830557ddf14e32e236f564f66f3d86c3212b73ba0a6ae10ffbc5691c3b1bb"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/packaging/build-python-runtimes.ps1",
+      "destination": "apps/mei-ling/packaging/build-python-runtimes.ps1",
+      "bytes": 3964,
+      "sha256": "5f95b58201e66ff4560bb2d9a51b80d75d48d00fc0f3bac41aa973b1356d64e9"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/packaging/check-runtime.mjs",
+      "destination": "apps/mei-ling/packaging/check-runtime.mjs",
+      "bytes": 1096,
+      "sha256": "a8fd1cc943c4ef40cf177d2b09fca7d699871d5a843038d5206777faf719fb85"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/packaging/llama_launcher.py",
+      "destination": "apps/mei-ling/packaging/llama_launcher.py",
+      "bytes": 1695,
+      "sha256": "2f6a4c8f4407039f745128c7f0e20ff001a81bc85f18fe250ac956aea87e6410"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/packaging/prepare-models.ps1",
+      "destination": "apps/mei-ling/packaging/prepare-models.ps1",
+      "bytes": 4020,
+      "sha256": "0a1110316956e5c7a780ee737a969b491314922651efbc67799a60ea3ddec33f"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/packaging/prepare-standalone.ps1",
+      "destination": "apps/mei-ling/packaging/prepare-standalone.ps1",
+      "bytes": 761,
+      "sha256": "7c8aa61b681f07a3120a264197eaa4becba38a9eb7288b02143e82c64f256c21"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/packaging/runtime/README.md",
+      "destination": "apps/mei-ling/packaging/runtime/README.md",
+      "bytes": 202,
+      "sha256": "22ba467fb2a5658d8690b603787936b34868a6477adf111c8ac162a76b2c078e"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/packaging/start-public-demo.mjs",
+      "destination": "apps/mei-ling/packaging/start-public-demo.mjs",
+      "bytes": 229,
+      "sha256": "215cadf3c87eebb2d34e5fc71b75d3e06ab6ea8adf48302ca517402493f03e42"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/firebase-ai-client.js",
+      "destination": "apps/mei-ling/public/firebase-ai-client.js",
+      "bytes": 15042,
+      "sha256": "3efd4a75b0d0bdfad05c978a7d510f1bf0f01670749dd53abc14c84b070399b1"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/news-result.js",
+      "destination": "apps/mei-ling/public/news-result.js",
+      "bytes": 3441,
+      "sha256": "d26321721b41185af07744a72c7a575ce74602daee57f77b127be1beaf400c45"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/runtime-readiness.js",
+      "destination": "apps/mei-ling/public/runtime-readiness.js",
+      "bytes": 1171,
+      "sha256": "4bf2c90f4cad7a1cd06850255dd17d8e5fb83874cf55a8be80edfc91b99bef1c"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/turn-detector.js",
+      "destination": "apps/mei-ling/public/turn-detector.js",
+      "bytes": 4517,
+      "sha256": "26fb0e6bd67ba62b2d157ddf4118ecd3f21e24a2b63a61387701a141877428ba"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/voice-input.js",
+      "destination": "apps/mei-ling/public/voice-input.js",
+      "bytes": 1026,
+      "sha256": "04fd25b92fb8df57bbf229cb28b4c18666d793445f5d9c31c34339b6b47737c0"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/voice-owner.js",
+      "destination": "apps/mei-ling/public/voice-owner.js",
+      "bytes": 13832,
+      "sha256": "bb4ba47addd8018db4424a27b30543ce558da322524593bea3bb587734c08d4e"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/wake-word.js",
+      "destination": "apps/mei-ling/public/wake-word.js",
+      "bytes": 1912,
+      "sha256": "5cda36aee281490496defaae92c745d7b6c44ad4d4dbb25c6023cd132aa0abb0"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/test_local_stt.py",
+      "destination": "apps/mei-ling/test_local_stt.py",
+      "bytes": 1452,
+      "sha256": "c85590d1c5bd5c99a49546f2876ff22f9b5928e59175f9d3260b5952cff27c0d"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/test_local_voice.py",
+      "destination": "apps/mei-ling/test_local_voice.py",
+      "bytes": 2602,
+      "sha256": "41fac74966f1b27044e8d85f04bcb09185fe8e8eaf3a772955b6c0861abccccd"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/.env.example",
+      "destination": "apps/mei-ling/.env.example",
+      "bytes": 334,
+      "sha256": "f0d422e3a206e19f21c9eb0da49e67d8899671d2c92d8060bb06ab36111f64d4"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/.gitignore",
+      "destination": "apps/mei-ling/.gitignore",
+      "bytes": 586,
+      "sha256": "3f5cdeca6ef3dbaf051398dac6b85010a589616e321ecfdaf86d80b3a89764e6"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/README.md",
+      "destination": "apps/mei-ling/README.md",
+      "bytes": 3018,
+      "sha256": "be92df5dbb6da9fc41a06af921bbc5588ab17bf80b994b51765a44154dc1c5f3"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/briefing.mjs",
+      "destination": "apps/mei-ling/brain/briefing.mjs",
+      "bytes": 12711,
+      "sha256": "879e07d28e315a87b3aef055a9a534ea1e6e3545e558cb6dc69743eac93c81ef"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/briefing.test.mjs",
+      "destination": "apps/mei-ling/brain/briefing.test.mjs",
+      "bytes": 5858,
+      "sha256": "b942d2a1297e16c2b00465d9908802a2d67ba19a0c35eb0d284394e81c2b9738"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/db.mjs",
+      "destination": "apps/mei-ling/brain/db.mjs",
+      "bytes": 42187,
+      "sha256": "27b8de471559307de4c375f82aa6a3c0e9d07551c2dc24af70c1b41eeca20042"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/db.test.mjs",
+      "destination": "apps/mei-ling/brain/db.test.mjs",
+      "bytes": 11505,
+      "sha256": "5b7ef4f63e6b709f59c239dcc03efdeae828d29b6e0fd66ca705e7dc2726f902"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/instructions.mjs",
+      "destination": "apps/mei-ling/brain/instructions.mjs",
+      "bytes": 1570,
+      "sha256": "20ee1c3c436773628b780800c2c9bca56aa5640a0c6ea1dd41cf2180e8a0fd04"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/instructions.test.mjs",
+      "destination": "apps/mei-ling/brain/instructions.test.mjs",
+      "bytes": 1400,
+      "sha256": "7f4ffdb7b313166209930bb464305ffc44c28e124ba921b1fa21a57663ebebe7"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/policy.mjs",
+      "destination": "apps/mei-ling/brain/policy.mjs",
+      "bytes": 5594,
+      "sha256": "ddbf262f7628c98f58e6a26fe002cf6ba1a1bbf019192c3f61ff8814ed8b35fb"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/rss.mjs",
+      "destination": "apps/mei-ling/brain/rss.mjs",
+      "bytes": 27505,
+      "sha256": "03bf4a193fc98d8f1385395281153148ddbf1db847e300ba69c145f41147cf78"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/rss.test.mjs",
+      "destination": "apps/mei-ling/brain/rss.test.mjs",
+      "bytes": 8363,
+      "sha256": "afe34356d919d23f179048b13b2a00e0b2868e79cf89144aeebf108db413c0a6"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/scheduler.mjs",
+      "destination": "apps/mei-ling/brain/scheduler.mjs",
+      "bytes": 17816,
+      "sha256": "aa6d5a071fff5cceb4cce5d96cee3722917bf8658be589f7af755d80628288eb"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/scheduler.test.mjs",
+      "destination": "apps/mei-ling/brain/scheduler.test.mjs",
+      "bytes": 6976,
+      "sha256": "07711b4231d556116b991244b29cf77e42ec7e0fd8112bc6d2a261eea252060d"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/brain/source-catalog.mjs",
+      "destination": "apps/mei-ling/brain/source-catalog.mjs",
+      "bytes": 9224,
+      "sha256": "2ea1ce476e0ee8cc514919a354ff1113234bb39cd6f9bff49aa36bd5e9b4ec7a"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/data/.gitkeep",
+      "destination": "apps/mei-ling/data/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/local_stt.py",
+      "destination": "apps/mei-ling/local_stt.py",
+      "bytes": 14469,
+      "sha256": "b5f4bfdf3483dd1e517338096b9053ee5b7c444aa9c3294008a2611823a3ad67"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/local_voice.py",
+      "destination": "apps/mei-ling/local_voice.py",
+      "bytes": 11201,
+      "sha256": "b12d04e8ec96df526633e529f33bb713ce00c044f229605a5a060a3eaeb47e49"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/package.json",
+      "destination": "apps/mei-ling/package.json",
+      "bytes": 1607,
+      "sha256": "92bf043b8651ac0dac2feb88513a438827862fcbdad8e8ceb9c39d149638cf1f"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/app.js",
+      "destination": "apps/mei-ling/public/app.js",
+      "bytes": 92363,
+      "sha256": "411a85cf9052325cdfa1296d345db9f55c82da6f968b11f582c7e73ee889d7bc"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/audio/codec-disconnect.wav",
+      "destination": "apps/mei-ling/public/audio/codec-disconnect.wav",
+      "bytes": 37122,
+      "sha256": "2c3062530458a7c77ba47bda66e2e952fa0dee85ae467cbd87d1ef133cd92f2c"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/audio/metal-gear-codec.mp3",
+      "destination": "apps/mei-ling/public/audio/metal-gear-codec.mp3",
+      "bytes": 249520,
+      "sha256": "97e12d5700aa0ebcc8c07f6eaba3df8ccd8eafa02150c6cd58b5cbdd46495c91"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/conversation.css",
+      "destination": "apps/mei-ling/public/conversation.css",
+      "bytes": 8468,
+      "sha256": "0a340e929fe49df0d2d943a76620cecc78741eaf20181f6dc9b9e670d1fee6e9"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/effects.css",
+      "destination": "apps/mei-ling/public/effects.css",
+      "bytes": 2230,
+      "sha256": "bdf22a9f8fcaba386ac37f7466ab365854371be14e3ea2767b2b2e387b9cf53f"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/expression-system.css",
+      "destination": "apps/mei-ling/public/expression-system.css",
+      "bytes": 477,
+      "sha256": "a11aea3848c7f65092b3f53ce1c4c9b2cd8896880c9bf7d9c6617773ea839234"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/figma-mei-manga-approved.png",
+      "destination": "apps/mei-ling/public/figma-mei-manga-approved.png",
+      "bytes": 2783264,
+      "sha256": "12f16e457a010f01450772b5bd36f893bdd836554efce575e3a9652cffe48b92"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/figma-miura-manga-approved.png",
+      "destination": "apps/mei-ling/public/figma-miura-manga-approved.png",
+      "bytes": 2854931,
+      "sha256": "59fde5559fb52ff9f70ae058be5b56a89823b5759cc370988c9c765a26ae28b4"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/figma-portrait-motion.css",
+      "destination": "apps/mei-ling/public/figma-portrait-motion.css",
+      "bytes": 1400,
+      "sha256": "2b227985196e811b7cb46ff0bd6d854f76894b196948f8a04355b00508f2ccfa"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/index.html",
+      "destination": "apps/mei-ling/public/index.html",
+      "bytes": 6722,
+      "sha256": "8f1c3407e2e9686860695d80ab982cffa7837d6fa970a419069fe34d858a4e73"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/manifest.webmanifest",
+      "destination": "apps/mei-ling/public/manifest.webmanifest",
+      "bytes": 368,
+      "sha256": "e77df75f89347d996b1e69b91188e495245a92721cd90f23b6e0298fd1e23bc8"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/mei-codec-ps1.png",
+      "destination": "apps/mei-ling/public/mei-codec-ps1.png",
+      "bytes": 2049147,
+      "sha256": "449cd415bd6a2c91058d016b2800028b6e12c4baca97a496a7f36b3bed8ef995"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/mei-expression-angry-v1.png",
+      "destination": "apps/mei-ling/public/mei-expression-angry-v1.png",
+      "bytes": 2698106,
+      "sha256": "f6f4e7da3157bea38674aa3bbf1c92d0aeceaa9482aa84f74b8d63e0aa7ad4f9"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/mei-expression-embarrassed-v1.png",
+      "destination": "apps/mei-ling/public/mei-expression-embarrassed-v1.png",
+      "bytes": 2779378,
+      "sha256": "2426d507af2b3025d547fe6d6068b34963585ebc0cc78514c66c3e7544a5d15d"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/mei-expression-laughing-v1.png",
+      "destination": "apps/mei-ling/public/mei-expression-laughing-v1.png",
+      "bytes": 2941328,
+      "sha256": "583d2202fb31cbb5d9836ce27c65d11d907ced5f7637b66c2aa11b115de7691b"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/mei-expression-serious-v1.png",
+      "destination": "apps/mei-ling/public/mei-expression-serious-v1.png",
+      "bytes": 2843612,
+      "sha256": "98803956ba00cd4ac72b08251ebe357f626b67b38cfec4c25588f37453c326bb"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/panels.css",
+      "destination": "apps/mei-ling/public/panels.css",
+      "bytes": 11639,
+      "sha256": "c3898806fb7aba497b3d38f28347d14c80037e9c8d350f3556208c98871078ec"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/service-worker.js",
+      "destination": "apps/mei-ling/public/service-worker.js",
+      "bytes": 2737,
+      "sha256": "75995c19898c5497afb7cad9ae8dec9e09725ce7bada5a6ebc9f28eb7703678b"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/styles.css",
+      "destination": "apps/mei-ling/public/styles.css",
+      "bytes": 3780,
+      "sha256": "a42385a840fabd5b52e0caff58c31676c120c3695cfd8c3bcb9b4c9876b54e51"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/server.mjs",
+      "destination": "apps/mei-ling/server.mjs",
+      "bytes": 113814,
+      "sha256": "d23b3c60843b5a854c33e22d187ad7290a8aa2baa628e375d4f0ed333ed92279"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/start.mjs",
+      "destination": "apps/mei-ling/start.mjs",
+      "bytes": 4347,
+      "sha256": "6ab8cbf1a54a586d1843faab794043a6bf5e19319cd8abaf6edcb9811593c7b4"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/audio/codec-connect.wav",
+      "destination": "apps/mei-ling/public/audio/codec-connect.wav",
+      "bytes": 37122,
+      "sha256": "8c04e448c6e178b963f1df59ff3f77a06be71f65dac633835e4cee5817fdc61d"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/audio/codec-incoming.wav",
+      "destination": "apps/mei-ling/public/audio/codec-incoming.wav",
+      "bytes": 282318,
+      "sha256": "2e9047d6ca3a29b8049a9f4469b07e5ceef36b555aba56788cc84a5f80344d63"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/audio/codec-outgoing.wav",
+      "destination": "apps/mei-ling/public/audio/codec-outgoing.wav",
+      "bytes": 211758,
+      "sha256": "10c04d69d6ded21f3d6ec9657efbbd256f1ce66e638e9f4dd5d07bac3e9c1da2"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/figma-dry-brush.svg",
+      "destination": "apps/mei-ling/public/figma-dry-brush.svg",
+      "bytes": 785,
+      "sha256": "57f47b4bf87b35362504a285e9f3ea552cf2be0bf932bc2499051bbbd7195ed0"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/figma-ink-slash.svg",
+      "destination": "apps/mei-ling/public/figma-ink-slash.svg",
+      "bytes": 600,
+      "sha256": "902b94e73709f49319942a546294ae6d654869ee80952305d6624a33995e92c3"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/figma-ink-wash.svg",
+      "destination": "apps/mei-ling/public/figma-ink-wash.svg",
+      "bytes": 867,
+      "sha256": "b80ef2a938b73a247befa6fad7d46f7971995b811bcbbcc59ba927fe234b4b2e"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/figma-waveform.svg",
+      "destination": "apps/mei-ling/public/figma-waveform.svg",
+      "bytes": 585,
+      "sha256": "66cbdf16cfa0bd4d338a0e027b4bbc1a2ed6a0cadfe584e2b96616e5c3746381"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/mei-ink-operator-v2.png",
+      "destination": "apps/mei-ling/public/mei-ink-operator-v2.png",
+      "bytes": 2783264,
+      "sha256": "12f16e457a010f01450772b5bd36f893bdd836554efce575e3a9652cffe48b92"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/mei-operator.png",
+      "destination": "apps/mei-ling/public/mei-operator.png",
+      "bytes": 1624080,
+      "sha256": "fac35354bec5cc7f088cdef44f7094dd2bdc542acc6318d9a282a09d07a3788e"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/miura-ink-operative-v2.png",
+      "destination": "apps/mei-ling/public/miura-ink-operative-v2.png",
+      "bytes": 2905783,
+      "sha256": "0e33e58cd837a2142e05b15343f4a90a28416e4cf649ce6be383fd707add8c7a"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/miura-ink-operative-v3.png",
+      "destination": "apps/mei-ling/public/miura-ink-operative-v3.png",
+      "bytes": 2961152,
+      "sha256": "3457ea8499e8c5c9e8cc72eb3f55187a748fd326d120912a3b6b5bc811248469"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/miura-ink-operative-v4-manga-eyes.png",
+      "destination": "apps/mei-ling/public/miura-ink-operative-v4-manga-eyes.png",
+      "bytes": 2854931,
+      "sha256": "59fde5559fb52ff9f70ae058be5b56a89823b5759cc370988c9c765a26ae28b4"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/user-codec-ps1.png",
+      "destination": "apps/mei-ling/public/user-codec-ps1.png",
+      "bytes": 1283126,
+      "sha256": "9f17a07a7029f8d488b568bc904750e3acd0d8c1ac8a5222ef1af1afe317e1b9"
+    },
+    {
+      "source": "C:/Users/miura/Documents/mei ling/public/user-reference.png",
+      "destination": "apps/mei-ling/public/user-reference.png",
+      "bytes": 192921,
+      "sha256": "98886892dccb6c613ee612de853da5907e7e7e07910be22341e2bdce168ed19a"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/.gitignore",
+      "destination": "apps/curriculum/mediakit/.gitignore",
+      "bytes": 51,
+      "sha256": "c956b6d9cd51aa13a7aa4a21239c01540fd7590859a6f2b6029f208cda39d672"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/firebase.json",
+      "destination": "apps/curriculum/mediakit/firebase.json",
+      "bytes": 1071,
+      "sha256": "4ccba9b924420fd82987ccbb1c11da3d757e8f18837a8eef779ea33630741948"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/index.html",
+      "destination": "apps/curriculum/mediakit/index.html",
+      "bytes": 433,
+      "sha256": "6a1976a0555ec8364d86fd5180a12de45bb1c5f104c33b18e255e1abdd368682"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/package-lock.json",
+      "destination": "apps/curriculum/mediakit/package-lock.json",
+      "bytes": 89155,
+      "sha256": "16d5d4505ba80e59791eebb21cd1fc18cf47b8be5a463627824d2ec9b6e593cc"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/package.json",
+      "destination": "apps/curriculum/mediakit/package.json",
+      "bytes": 685,
+      "sha256": "8ec824263e111843074f1d210a5da78a100ccfc12cd735e164dc799c3dac87e6"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/Francesco-Saccullo_CV.pdf",
+      "destination": "apps/curriculum/mediakit/public/Francesco-Saccullo_CV.pdf",
+      "bytes": 264600,
+      "sha256": "2b82219d32a650b8cf3b07d3e160d315852bd439f36dedc638d7a47a92a339c5"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/app.js",
+      "destination": "apps/curriculum/mediakit/public/meiling/app.js",
+      "bytes": 92363,
+      "sha256": "411a85cf9052325cdfa1296d345db9f55c82da6f968b11f582c7e73ee889d7bc"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/audio/codec-connect.wav",
+      "destination": "apps/curriculum/mediakit/public/meiling/audio/codec-connect.wav",
+      "bytes": 37122,
+      "sha256": "8c04e448c6e178b963f1df59ff3f77a06be71f65dac633835e4cee5817fdc61d"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/audio/codec-disconnect.wav",
+      "destination": "apps/curriculum/mediakit/public/meiling/audio/codec-disconnect.wav",
+      "bytes": 37122,
+      "sha256": "2c3062530458a7c77ba47bda66e2e952fa0dee85ae467cbd87d1ef133cd92f2c"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/audio/codec-incoming.wav",
+      "destination": "apps/curriculum/mediakit/public/meiling/audio/codec-incoming.wav",
+      "bytes": 282318,
+      "sha256": "2e9047d6ca3a29b8049a9f4469b07e5ceef36b555aba56788cc84a5f80344d63"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/audio/codec-outgoing.wav",
+      "destination": "apps/curriculum/mediakit/public/meiling/audio/codec-outgoing.wav",
+      "bytes": 211758,
+      "sha256": "10c04d69d6ded21f3d6ec9657efbbd256f1ce66e638e9f4dd5d07bac3e9c1da2"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/audio/metal-gear-codec.mp3",
+      "destination": "apps/curriculum/mediakit/public/meiling/audio/metal-gear-codec.mp3",
+      "bytes": 249520,
+      "sha256": "97e12d5700aa0ebcc8c07f6eaba3df8ccd8eafa02150c6cd58b5cbdd46495c91"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/conversation.css",
+      "destination": "apps/curriculum/mediakit/public/meiling/conversation.css",
+      "bytes": 8468,
+      "sha256": "0a340e929fe49df0d2d943a76620cecc78741eaf20181f6dc9b9e670d1fee6e9"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/effects.css",
+      "destination": "apps/curriculum/mediakit/public/meiling/effects.css",
+      "bytes": 2230,
+      "sha256": "bdf22a9f8fcaba386ac37f7466ab365854371be14e3ea2767b2b2e387b9cf53f"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/expression-system.css",
+      "destination": "apps/curriculum/mediakit/public/meiling/expression-system.css",
+      "bytes": 477,
+      "sha256": "a11aea3848c7f65092b3f53ce1c4c9b2cd8896880c9bf7d9c6617773ea839234"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/figma-dry-brush.svg",
+      "destination": "apps/curriculum/mediakit/public/meiling/figma-dry-brush.svg",
+      "bytes": 785,
+      "sha256": "57f47b4bf87b35362504a285e9f3ea552cf2be0bf932bc2499051bbbd7195ed0"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/figma-ink-slash.svg",
+      "destination": "apps/curriculum/mediakit/public/meiling/figma-ink-slash.svg",
+      "bytes": 600,
+      "sha256": "902b94e73709f49319942a546294ae6d654869ee80952305d6624a33995e92c3"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/figma-ink-wash.svg",
+      "destination": "apps/curriculum/mediakit/public/meiling/figma-ink-wash.svg",
+      "bytes": 867,
+      "sha256": "b80ef2a938b73a247befa6fad7d46f7971995b811bcbbcc59ba927fe234b4b2e"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/figma-mei-manga-approved.png",
+      "destination": "apps/curriculum/mediakit/public/meiling/figma-mei-manga-approved.png",
+      "bytes": 2783264,
+      "sha256": "12f16e457a010f01450772b5bd36f893bdd836554efce575e3a9652cffe48b92"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/figma-miura-manga-approved.png",
+      "destination": "apps/curriculum/mediakit/public/meiling/figma-miura-manga-approved.png",
+      "bytes": 2854931,
+      "sha256": "59fde5559fb52ff9f70ae058be5b56a89823b5759cc370988c9c765a26ae28b4"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/figma-portrait-motion.css",
+      "destination": "apps/curriculum/mediakit/public/meiling/figma-portrait-motion.css",
+      "bytes": 1400,
+      "sha256": "2b227985196e811b7cb46ff0bd6d854f76894b196948f8a04355b00508f2ccfa"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/figma-waveform.svg",
+      "destination": "apps/curriculum/mediakit/public/meiling/figma-waveform.svg",
+      "bytes": 585,
+      "sha256": "66cbdf16cfa0bd4d338a0e027b4bbc1a2ed6a0cadfe584e2b96616e5c3746381"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/firebase-ai-client.js",
+      "destination": "apps/curriculum/mediakit/public/meiling/firebase-ai-client.js",
+      "bytes": 15042,
+      "sha256": "3efd4a75b0d0bdfad05c978a7d510f1bf0f01670749dd53abc14c84b070399b1"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/index.html",
+      "destination": "apps/curriculum/mediakit/public/meiling/index.html",
+      "bytes": 6722,
+      "sha256": "8f1c3407e2e9686860695d80ab982cffa7837d6fa970a419069fe34d858a4e73"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/manifest.webmanifest",
+      "destination": "apps/curriculum/mediakit/public/meiling/manifest.webmanifest",
+      "bytes": 368,
+      "sha256": "e77df75f89347d996b1e69b91188e495245a92721cd90f23b6e0298fd1e23bc8"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/mei-codec-ps1.png",
+      "destination": "apps/curriculum/mediakit/public/meiling/mei-codec-ps1.png",
+      "bytes": 2049147,
+      "sha256": "449cd415bd6a2c91058d016b2800028b6e12c4baca97a496a7f36b3bed8ef995"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/mei-expression-angry-v1.png",
+      "destination": "apps/curriculum/mediakit/public/meiling/mei-expression-angry-v1.png",
+      "bytes": 2698106,
+      "sha256": "f6f4e7da3157bea38674aa3bbf1c92d0aeceaa9482aa84f74b8d63e0aa7ad4f9"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/mei-expression-embarrassed-v1.png",
+      "destination": "apps/curriculum/mediakit/public/meiling/mei-expression-embarrassed-v1.png",
+      "bytes": 2779378,
+      "sha256": "2426d507af2b3025d547fe6d6068b34963585ebc0cc78514c66c3e7544a5d15d"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/mei-expression-laughing-v1.png",
+      "destination": "apps/curriculum/mediakit/public/meiling/mei-expression-laughing-v1.png",
+      "bytes": 2941328,
+      "sha256": "583d2202fb31cbb5d9836ce27c65d11d907ced5f7637b66c2aa11b115de7691b"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/mei-expression-serious-v1.png",
+      "destination": "apps/curriculum/mediakit/public/meiling/mei-expression-serious-v1.png",
+      "bytes": 2843612,
+      "sha256": "98803956ba00cd4ac72b08251ebe357f626b67b38cfec4c25588f37453c326bb"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/mei-ink-operator-v2.png",
+      "destination": "apps/curriculum/mediakit/public/meiling/mei-ink-operator-v2.png",
+      "bytes": 2783264,
+      "sha256": "12f16e457a010f01450772b5bd36f893bdd836554efce575e3a9652cffe48b92"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/mei-operator.png",
+      "destination": "apps/curriculum/mediakit/public/meiling/mei-operator.png",
+      "bytes": 1624080,
+      "sha256": "fac35354bec5cc7f088cdef44f7094dd2bdc542acc6318d9a282a09d07a3788e"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/miura-ink-operative-v2.png",
+      "destination": "apps/curriculum/mediakit/public/meiling/miura-ink-operative-v2.png",
+      "bytes": 2905783,
+      "sha256": "0e33e58cd837a2142e05b15343f4a90a28416e4cf649ce6be383fd707add8c7a"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/miura-ink-operative-v3.png",
+      "destination": "apps/curriculum/mediakit/public/meiling/miura-ink-operative-v3.png",
+      "bytes": 2961152,
+      "sha256": "3457ea8499e8c5c9e8cc72eb3f55187a748fd326d120912a3b6b5bc811248469"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/miura-ink-operative-v4-manga-eyes.png",
+      "destination": "apps/curriculum/mediakit/public/meiling/miura-ink-operative-v4-manga-eyes.png",
+      "bytes": 2854931,
+      "sha256": "59fde5559fb52ff9f70ae058be5b56a89823b5759cc370988c9c765a26ae28b4"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/news-result.js",
+      "destination": "apps/curriculum/mediakit/public/meiling/news-result.js",
+      "bytes": 3441,
+      "sha256": "d26321721b41185af07744a72c7a575ce74602daee57f77b127be1beaf400c45"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/panels.css",
+      "destination": "apps/curriculum/mediakit/public/meiling/panels.css",
+      "bytes": 11639,
+      "sha256": "c3898806fb7aba497b3d38f28347d14c80037e9c8d350f3556208c98871078ec"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/runtime-readiness.js",
+      "destination": "apps/curriculum/mediakit/public/meiling/runtime-readiness.js",
+      "bytes": 1171,
+      "sha256": "4bf2c90f4cad7a1cd06850255dd17d8e5fb83874cf55a8be80edfc91b99bef1c"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/service-worker.js",
+      "destination": "apps/curriculum/mediakit/public/meiling/service-worker.js",
+      "bytes": 2737,
+      "sha256": "75995c19898c5497afb7cad9ae8dec9e09725ce7bada5a6ebc9f28eb7703678b"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/styles.css",
+      "destination": "apps/curriculum/mediakit/public/meiling/styles.css",
+      "bytes": 3780,
+      "sha256": "a42385a840fabd5b52e0caff58c31676c120c3695cfd8c3bcb9b4c9876b54e51"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/turn-detector.js",
+      "destination": "apps/curriculum/mediakit/public/meiling/turn-detector.js",
+      "bytes": 4517,
+      "sha256": "26fb0e6bd67ba62b2d157ddf4118ecd3f21e24a2b63a61387701a141877428ba"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/user-codec-ps1.png",
+      "destination": "apps/curriculum/mediakit/public/meiling/user-codec-ps1.png",
+      "bytes": 1283126,
+      "sha256": "9f17a07a7029f8d488b568bc904750e3acd0d8c1ac8a5222ef1af1afe317e1b9"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/user-reference.png",
+      "destination": "apps/curriculum/mediakit/public/meiling/user-reference.png",
+      "bytes": 192921,
+      "sha256": "98886892dccb6c613ee612de853da5907e7e7e07910be22341e2bdce168ed19a"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/voice-input.js",
+      "destination": "apps/curriculum/mediakit/public/meiling/voice-input.js",
+      "bytes": 1026,
+      "sha256": "04fd25b92fb8df57bbf229cb28b4c18666d793445f5d9c31c34339b6b47737c0"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/voice-owner.js",
+      "destination": "apps/curriculum/mediakit/public/meiling/voice-owner.js",
+      "bytes": 13832,
+      "sha256": "bb4ba47addd8018db4424a27b30543ce558da322524593bea3bb587734c08d4e"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/public/meiling/wake-word.js",
+      "destination": "apps/curriculum/mediakit/public/meiling/wake-word.js",
+      "bytes": 1912,
+      "sha256": "5cda36aee281490496defaae92c745d7b6c44ad4d4dbb25c6023cd132aa0abb0"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/README.md",
+      "destination": "apps/curriculum/mediakit/README.md",
+      "bytes": 1256,
+      "sha256": "e984583bb4a736a2e2d7c96d0555ef592ba9b472e9663babc3599b1876588290"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/src/App.tsx",
+      "destination": "apps/curriculum/mediakit/src/App.tsx",
+      "bytes": 39624,
+      "sha256": "c5bcee907112628332b4a7e242cd1a22f8d78b6a01d4af34ebe3cbae9e87fe75"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/src/imports/contact-photo.jpg",
+      "destination": "apps/curriculum/mediakit/src/imports/contact-photo.jpg",
+      "bytes": 182278,
+      "sha256": "a1f227e037428e64e507f50011a4c7ee31af294121139810b59db686302541a4"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/src/imports/grayfox-prototype.png",
+      "destination": "apps/curriculum/mediakit/src/imports/grayfox-prototype.png",
+      "bytes": 319408,
+      "sha256": "7e89c294ab16c6ff36401fe2c7a6364747cffba62d42f7fa905d4b7db345d847"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/src/imports/mei-ling-prototype.png",
+      "destination": "apps/curriculum/mediakit/src/imports/mei-ling-prototype.png",
+      "bytes": 246592,
+      "sha256": "ae50dae5181c0bc8138d6be62180e4d5ec7013eeeb97cc9c799e64bca13b83ba"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/src/imports/otacon-current.png",
+      "destination": "apps/curriculum/mediakit/src/imports/otacon-current.png",
+      "bytes": 127909,
+      "sha256": "3711e5c8972b808368fb84224b418ded0144599aa2da2f99fb0f001bed4d9cdf"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/src/imports/profile-photo.jpg",
+      "destination": "apps/curriculum/mediakit/src/imports/profile-photo.jpg",
+      "bytes": 1151589,
+      "sha256": "f0eff310778ca0e2aad79e4cf283e071421a6ce7fa35e6f60ea84cea87da2301"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/src/index.css",
+      "destination": "apps/curriculum/mediakit/src/index.css",
+      "bytes": 3027,
+      "sha256": "c83ecd8bbc40ae2ac4c58c2770e6ab39093d28cd004adcfe2bbce191a9b45d9f"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/src/main.tsx",
+      "destination": "apps/curriculum/mediakit/src/main.tsx",
+      "bytes": 232,
+      "sha256": "5f49dce6e6cc4b5d678cf529ef892af0ab7dfa6afb300b11ad559224019b8b05"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/tsconfig.json",
+      "destination": "apps/curriculum/mediakit/tsconfig.json",
+      "bytes": 556,
+      "sha256": "9a1e96d63eaccd5416b2f78ecaccf2b3a27ca71e213fa5859cf5349c66123bf9"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/vite.config.ts",
+      "destination": "apps/curriculum/mediakit/vite.config.ts",
+      "bytes": 307,
+      "sha256": "23622b070eadc6cbc6380e70b0960085711960e33c0dd1347b6c011faa12cdd1"
+    },
+    {
+      "source": "C:/Users/miura/Documents/Codex/2026-09-16/ri/mediakit-site/vite.figma-original.txt",
+      "destination": "apps/curriculum/mediakit/vite.figma-original.txt",
+      "bytes": 11797,
+      "sha256": "b369491c240044980afe3dcf74bc534a14b2faeb6ec954e083b7e9a49bf316e2"
+    },
+    {
+      "source": "C:/Users/miura/Documents/ChatGPT/mediakit sender/candidate-profile.md",
+      "destination": "agents/candidature/candidate-profile.md",
+      "bytes": 9210,
+      "sha256": "db35bd27a03bb10b13a38b795d0d8a43424642db57a8517193cc453ed2cf29f2"
+    },
+    {
+      "source": "C:/Users/miura/Documents/ChatGPT/mediakit sender/applications.jsonl",
+      "destination": "agents/candidature/applications.jsonl",
+      "bytes": 85210,
+      "sha256": "4999d59d5c1133bfa04eb6cfa15b2e15f3c8d0d059e60d522a39a462e60770ed"
+    },
+    {
+      "source": "C:/Users/miura/Documents/ChatGPT/mediakit sender/reports/2026-09-25.md",
+      "destination": "agents/candidature/reports/2026-09-25.md",
+      "bytes": 9250,
+      "sha256": "e48ce6f3d535a302d59f60d9a0a19dbd0145cdc3cc442aaf77069157f0e7a382"
+    },
+    {
+      "source": "C:/Users/miura/Documents/ChatGPT/mediakit sender/reports/2026-09-26.md",
+      "destination": "agents/candidature/reports/2026-09-26.md",
+      "bytes": 3992,
+      "sha256": "c139239857de33471334ec48e66813ba4fd1ab990a7283431304f69769724391"
+    },
+    {
+      "source": "C:/Users/miura/Documents/ChatGPT/mediakit sender/reports/2026-09-27.md",
+      "destination": "agents/candidature/reports/2026-09-27.md",
+      "bytes": 5647,
+      "sha256": "4c059c294ed48bac7242f160d47110e23381eac94c4c7e0ef1c679a3608b0728"
+    },
+    {
+      "source": "C:/Users/miura/Documents/ChatGPT/mediakit sender/reports/2026-09-28-etals-cover-letter.txt",
+      "destination": "agents/candidature/reports/2026-09-28-etals-cover-letter.txt",
+      "bytes": 1421,
+      "sha256": "6d1ba800ec79e48c65da4583b6586f825aafbc7e7b931cf5468735434202fb64"
+    },
+    {
+      "source": "C:/Users/miura/Documents/ChatGPT/mediakit sender/reports/2026-09-28.md",
+      "destination": "agents/candidature/reports/2026-09-28.md",
+      "bytes": 20246,
+      "sha256": "ace7a69968b08692fcf07f5f807d399f075bf0aca4957d2be15bb614c88329f7"
+    },
+    {
+      "source": "C:/Users/miura/Documents/ChatGPT/mediakit sender/reports/2026-10-01.md",
+      "destination": "agents/candidature/reports/2026-10-01.md",
+      "bytes": 11680,
+      "sha256": "789bea50dc9c2808cf81db089c047dcd7f4f67d1ae13808eff3bf8214771bf5b"
+    },
+    {
+      "source": "C:/Users/miura/Documents/ChatGPT/mediakit sender/reports/2026-10-02.md",
+      "destination": "agents/candidature/reports/2026-10-02.md",
+      "bytes": 12776,
+      "sha256": "1f653b9258756ba58db8593ca491b08d8900f7931a3a6eb892a96e1717807b2d"
+    },
+    {
+      "source": "C:/Users/miura/Documents/ChatGPT/mediakit sender/reports/2026-10-03.md",
+      "destination": "agents/candidature/reports/2026-10-03.md",
+      "bytes": 3227,
+      "sha256": "db322ab91d40b9cd9ed51f12895381eee5909d9031661d9810c4b1de2a20f489"
+    },
+    {
+      "source": "C:/Users/miura/Documents/ChatGPT/mediakit sender/reports/evidence/2026-10-01-restate-confirmation.jpg",
+      "destination": "agents/candidature/reports/evidence/2026-10-01-restate-confirmation.jpg",
+      "bytes": 32608,
+      "sha256": "25ddaeb264b7b489f015a304548bd8ebd38b676b6e0daf3035b52009c41b7b4b"
+    },
+    {
+      "source": "C:/Users/miura/Documents/ChatGPT/mediakit sender/reports/evidence/2026-10-02-99px.png",
+      "destination": "agents/candidature/reports/evidence/2026-10-02-99px.png",
+      "bytes": 109184,
+      "sha256": "4caa3c2f2a4799b9349207b14003ce511b0ee5b653c636c23680d1571a4b02dc"
+    },
+    {
+      "source": "C:/Users/miura/Documents/ChatGPT/mediakit sender/reports/evidence/2026-10-02-circle.png",
+      "destination": "agents/candidature/reports/evidence/2026-10-02-circle.png",
+      "bytes": 40455,
+      "sha256": "2632a74fbead56e232ecdf58df4f223ef263ac0e4b83130b2b94b6d8629f78b8"
+    },
+    {
+      "source": "C:/Users/miura/Documents/ChatGPT/mediakit sender/reports/evidence/2026-10-02-exelab.png",
+      "destination": "agents/candidature/reports/evidence/2026-10-02-exelab.png",
+      "bytes": 30684,
+      "sha256": "99ecb35d91c10680be8276941e554b79139510e37557f82b79af9ec3ddf1740b"
+    },
+    {
+      "source": "C:/Users/miura/Documents/ChatGPT/mediakit sender/output/pdf/Francesco-Saccullo-CV.pdf",
+      "destination": "agents/candidature/output/pdf/Francesco-Saccullo-CV.pdf",
+      "bytes": 4102,
+      "sha256": "504cd776c7972b91d92d76fab35ed9a486fb40946a6f6124c85fdcda38b29b0f"
+    },
+    {
+      "source": "C:/Users/miura/Documents/ChatGPT/mediakit sender/output/pdf/Francesco-Saccullo_CV_2027.pdf",
+      "destination": "agents/candidature/output/pdf/Francesco-Saccullo_CV_2027.pdf",
+      "bytes": 264600,
+      "sha256": "2b82219d32a650b8cf3b07d3e160d315852bd439f36dedc638d7a47a92a339c5"
+    },
+    {
+      "source": "C:/Users/miura/.codex/automations/candidature-quotidiane-con-media-kit/automation.toml",
+      "destination": "agents/candidature/automation.snapshot.toml",
+      "bytes": 5026,
+      "sha256": "6f7314c917a48a9ee6c6a8288e2e43aecb2aa76dbc487f110096545fd33906e8"
+    }
+  ]
+}

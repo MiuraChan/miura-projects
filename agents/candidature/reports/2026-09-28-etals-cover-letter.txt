@@ -1,0 +1,18 @@
+Hello Etals team,
+
+I am applying for the remote Product Designer (UI/UX) role. Your focus on using AI to help e-commerce teams spend less time on manual content work connects with my own work on usable AI interfaces and product prototypes.
+
+I bring 14 years of UI/UX experience and four years with Figma, alongside hands-on software engineering in React and TypeScript. My background includes responsive search applications at Jobrapido, digital design systems and application code at Idegami, and micro-interactions and component architectures at HiBye. I have designed and implemented components used by other developers and designers.
+
+I would welcome the opportunity to bring that combination of design and implementation to coherent, practical interfaces for Etals customers. My independent work includes AI-assisted video editing and assistant interfaces, using Figma and AI-assisted development workflows.
+
+Media kit, professional profile and projects:
+https://francesco-saccullo-mediakit.web.app/
+Figma sample: https://www.figma.com/design/sKPjnwlzeQgcDtMdSo6y8R/GrayFox-UI-Flow?node-id=0-1&m=dev
+LinkedIn: https://www.linkedin.com/in/francescosaccullo/
+GitHub: https://github.com/MiuraChan
+
+I am based in Piacenza, Italy and immediately available for remote work. I prefer permanent employment and can complete asynchronous take-home technical assessments.
+
+Thank you for your consideration,
+Francesco Saccullo

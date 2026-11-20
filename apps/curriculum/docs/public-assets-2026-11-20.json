@@ -1,0 +1,302 @@
+{
+  "date": "2026-11-20",
+  "site": "https://francesco-saccullo-mediakit.web.app",
+  "version": "sites/francesco-saccullo-mediakit/versions/033ec1f178aede1a",
+  "files": [
+    {
+      "path": "/Francesco-Saccullo_CV.pdf",
+      "sha256": "976d669165662e253c391baad7f8c221fd4d9f313bbb1957920a0d5838675864",
+      "bytes": 102559
+    },
+    {
+      "path": "/Francesco-Saccullo_CV_IT.pdf",
+      "sha256": "5e4b69cbe2a7d3429b1c5f412c6ba863f4ff078a601909128653577a1648c8ba",
+      "bytes": 102721
+    },
+    {
+      "path": "/grayfox-figma-workspace.png",
+      "sha256": "9416c4b8f03eb208679d01f4debc344125e37cf1d434664a6e6ce3e9db926c62",
+      "bytes": 355953
+    },
+    {
+      "path": "/grayfox/app.js",
+      "sha256": "91422edb2e565862c62aeedaa6752d1d8ed0b7e727bfe74d9a39e4e9ad64350d",
+      "bytes": 93349
+    },
+    {
+      "path": "/grayfox/index.html",
+      "sha256": "d56d0625f9fdfe3812f3a8f23269d9dfd1be4a6b11efefbcf3b65dc62265a066",
+      "bytes": 26297
+    },
+    {
+      "path": "/grayfox/media-layout.js",
+      "sha256": "61f5463777f48a7e1c7e9c7e1e294d927eb4a4c4b25d3b1b5b7fc33539716c92",
+      "bytes": 2488
+    },
+    {
+      "path": "/grayfox/sample.mp4",
+      "sha256": "cbbbc3ed445dcdabc0f7cce89a49db04e08d2c7d6976212c976732ce6608ed92",
+      "bytes": 258370
+    },
+    {
+      "path": "/grayfox/styles.css",
+      "sha256": "5ed9139938e2d58b6747ed04854f839a8c6d1e55bd2eb095671b8cf9554d274a",
+      "bytes": 36216
+    },
+    {
+      "path": "/grayfox/web-bridge.js",
+      "sha256": "b14816fe1673f11240f2284d37416939a12c97e18e204dc12b4d4285ebf72288",
+      "bytes": 17827
+    },
+    {
+      "path": "/grayfox/web-demo.css",
+      "sha256": "d00905f7f419b681b579f458db73a2d2025c82b207367662da0dc8238c228d55",
+      "bytes": 827
+    },
+    {
+      "path": "/grayfox/web-demo.js",
+      "sha256": "e9afab23bd7dd98377f830fcdb856f96fb6c8603a6ceeea394ac114bf6dde6e9",
+      "bytes": 6140
+    },
+    {
+      "path": "/mei-ling-figma-codec.png",
+      "sha256": "64e812263a1e304b36b8dbdaa24c86e1475feaee2fb1df638534f6ebcdeefe0b",
+      "bytes": 1704411
+    },
+    {
+      "path": "/meiling/app.js",
+      "sha256": "eeb66a80b9f177dd670559321ce2d8bd0d1066404bce06752947b256e56b166c",
+      "bytes": 128182
+    },
+    {
+      "path": "/meiling/audio/codec-connect.wav",
+      "sha256": "8c04e448c6e178b963f1df59ff3f77a06be71f65dac633835e4cee5817fdc61d",
+      "bytes": 37122
+    },
+    {
+      "path": "/meiling/audio/codec-disconnect.wav",
+      "sha256": "2c3062530458a7c77ba47bda66e2e952fa0dee85ae467cbd87d1ef133cd92f2c",
+      "bytes": 37122
+    },
+    {
+      "path": "/meiling/audio/codec-incoming.wav",
+      "sha256": "2e9047d6ca3a29b8049a9f4469b07e5ceef36b555aba56788cc84a5f80344d63",
+      "bytes": 282318
+    },
+    {
+      "path": "/meiling/audio/codec-outgoing.wav",
+      "sha256": "10c04d69d6ded21f3d6ec9657efbbd256f1ce66e638e9f4dd5d07bac3e9c1da2",
+      "bytes": 211758
+    },
+    {
+      "path": "/meiling/audio/metal-gear-codec.mp3",
+      "sha256": "97e12d5700aa0ebcc8c07f6eaba3df8ccd8eafa02150c6cd58b5cbdd46495c91",
+      "bytes": 249520
+    },
+    {
+      "path": "/meiling/conversation.css",
+      "sha256": "831b326369f996a1daba7da19a81a574c8b84ffa47f30d4c5761a40c9892643d",
+      "bytes": 11998
+    },
+    {
+      "path": "/meiling/editorial-flow.js",
+      "sha256": "20d564aadc565656d28eaddf3679c6e81e475136382b73e09ee6d39ecf8fa023",
+      "bytes": 7863
+    },
+    {
+      "path": "/meiling/effects.css",
+      "sha256": "bdf22a9f8fcaba386ac37f7466ab365854371be14e3ea2767b2b2e387b9cf53f",
+      "bytes": 2230
+    },
+    {
+      "path": "/meiling/expression-system.css",
+      "sha256": "a11aea3848c7f65092b3f53ce1c4c9b2cd8896880c9bf7d9c6617773ea839234",
+      "bytes": 477
+    },
+    {
+      "path": "/meiling/figma-dry-brush.svg",
+      "sha256": "57f47b4bf87b35362504a285e9f3ea552cf2be0bf932bc2499051bbbd7195ed0",
+      "bytes": 785
+    },
+    {
+      "path": "/meiling/figma-ink-slash.svg",
+      "sha256": "902b94e73709f49319942a546294ae6d654869ee80952305d6624a33995e92c3",
+      "bytes": 600
+    },
+    {
+      "path": "/meiling/figma-ink-wash.svg",
+      "sha256": "b80ef2a938b73a247befa6fad7d46f7971995b811bcbbcc59ba927fe234b4b2e",
+      "bytes": 867
+    },
+    {
+      "path": "/meiling/figma-mei-manga-approved.png",
+      "sha256": "12f16e457a010f01450772b5bd36f893bdd836554efce575e3a9652cffe48b92",
+      "bytes": 2783264
+    },
+    {
+      "path": "/meiling/figma-miura-manga-approved.png",
+      "sha256": "59fde5559fb52ff9f70ae058be5b56a89823b5759cc370988c9c765a26ae28b4",
+      "bytes": 2854931
+    },
+    {
+      "path": "/meiling/figma-portrait-motion.css",
+      "sha256": "2b227985196e811b7cb46ff0bd6d854f76894b196948f8a04355b00508f2ccfa",
+      "bytes": 1400
+    },
+    {
+      "path": "/meiling/figma-waveform.svg",
+      "sha256": "66cbdf16cfa0bd4d338a0e027b4bbc1a2ed6a0cadfe584e2b96616e5c3746381",
+      "bytes": 585
+    },
+    {
+      "path": "/meiling/firebase-ai-client.js",
+      "sha256": "93652383d3ac62bb362848b4cca76fc3fc4da7aab808260c0df03ad512b63f32",
+      "bytes": 41282
+    },
+    {
+      "path": "/meiling/index.html",
+      "sha256": "cbb68b1de0f471b87850ec6ade08fd6b46eef5a585864c3d63d8c8b1c98c2225",
+      "bytes": 8282
+    },
+    {
+      "path": "/meiling/intel-snapshot.js",
+      "sha256": "73e2da9f70f4d2af1d8c72edbff668009610732df6bb3a33b3d79e205bb56f8b",
+      "bytes": 9905
+    },
+    {
+      "path": "/meiling/intel-snapshot.json",
+      "sha256": "e8093448818cb42cd594bd7154f77d7db46607d8ea144372d228bfe54870683c",
+      "bytes": 20356
+    },
+    {
+      "path": "/meiling/language.js",
+      "sha256": "6dd0eaefbc55c0d089275254f83fd6c80562b4966cf196885df0ffef9da79cb1",
+      "bytes": 1875
+    },
+    {
+      "path": "/meiling/manifest.webmanifest",
+      "sha256": "e77df75f89347d996b1e69b91188e495245a92721cd90f23b6e0298fd1e23bc8",
+      "bytes": 368
+    },
+    {
+      "path": "/meiling/mei-codec-ps1.png",
+      "sha256": "449cd415bd6a2c91058d016b2800028b6e12c4baca97a496a7f36b3bed8ef995",
+      "bytes": 2049147
+    },
+    {
+      "path": "/meiling/mei-expression-angry-v1.png",
+      "sha256": "f6f4e7da3157bea38674aa3bbf1c92d0aeceaa9482aa84f74b8d63e0aa7ad4f9",
+      "bytes": 2698106
+    },
+    {
+      "path": "/meiling/mei-expression-embarrassed-v1.png",
+      "sha256": "2426d507af2b3025d547fe6d6068b34963585ebc0cc78514c66c3e7544a5d15d",
+      "bytes": 2779378
+    },
+    {
+      "path": "/meiling/mei-expression-laughing-v1.png",
+      "sha256": "583d2202fb31cbb5d9836ce27c65d11d907ced5f7637b66c2aa11b115de7691b",
+      "bytes": 2941328
+    },
+    {
+      "path": "/meiling/mei-expression-serious-v1.png",
+      "sha256": "98803956ba00cd4ac72b08251ebe357f626b67b38cfec4c25588f37453c326bb",
+      "bytes": 2843612
+    },
+    {
+      "path": "/meiling/mei-ink-operator-v2.png",
+      "sha256": "12f16e457a010f01450772b5bd36f893bdd836554efce575e3a9652cffe48b92",
+      "bytes": 2783264
+    },
+    {
+      "path": "/meiling/mei-operator.png",
+      "sha256": "fac35354bec5cc7f088cdef44f7094dd2bdc542acc6318d9a282a09d07a3788e",
+      "bytes": 1624080
+    },
+    {
+      "path": "/meiling/miura-ink-operative-v2.png",
+      "sha256": "0e33e58cd837a2142e05b15343f4a90a28416e4cf649ce6be383fd707add8c7a",
+      "bytes": 2905783
+    },
+    {
+      "path": "/meiling/miura-ink-operative-v3.png",
+      "sha256": "3457ea8499e8c5c9e8cc72eb3f55187a748fd326d120912a3b6b5bc811248469",
+      "bytes": 2961152
+    },
+    {
+      "path": "/meiling/miura-ink-operative-v4-manga-eyes.png",
+      "sha256": "59fde5559fb52ff9f70ae058be5b56a89823b5759cc370988c9c765a26ae28b4",
+      "bytes": 2854931
+    },
+    {
+      "path": "/meiling/news-result.js",
+      "sha256": "86c26d0f2cb0f2360a2e799ead8ee34185bb58e3e47fb790725b86f1ea2170ff",
+      "bytes": 3559
+    },
+    {
+      "path": "/meiling/operative-avatar-masked-v1.png",
+      "sha256": "ea71628b063f44d85822d2aa117f735aad162c553e67455894e20cd866d2c5a9",
+      "bytes": 2988819
+    },
+    {
+      "path": "/meiling/operative-avatar.svg",
+      "sha256": "244af057813755dae2dc179b868366ae6a2428ddb73ba1c7fe9c427bf0c3baaa",
+      "bytes": 1571
+    },
+    {
+      "path": "/meiling/panels.css",
+      "sha256": "5a2bbff2d826d563d8d739ef4150c4d62b7ae77f199003ab0cc7d6be8ac9c43b",
+      "bytes": 18097
+    },
+    {
+      "path": "/meiling/runtime-readiness.js",
+      "sha256": "d88cad1858f3d252ae2511491f9227f9a6f55cdebef21249794dc1d8c0a94a4c",
+      "bytes": 1217
+    },
+    {
+      "path": "/meiling/service-worker.js",
+      "sha256": "09ff52ed49de558c619a4ee66ee466a3b4fde588849d7c47a763bb8c8e5a869b",
+      "bytes": 2948
+    },
+    {
+      "path": "/meiling/styles.css",
+      "sha256": "081b8fc81e3e6dfc72993509c87ea0730f3620eacb4d49f68e18753eeb01b2bb",
+      "bytes": 3790
+    },
+    {
+      "path": "/meiling/turn-detector.js",
+      "sha256": "c2175b530a96a61dbea24dd2890d1feb4e95421e6d8a7d85acda425e185538e9",
+      "bytes": 4793
+    },
+    {
+      "path": "/meiling/user-codec-ps1.png",
+      "sha256": "9f17a07a7029f8d488b568bc904750e3acd0d8c1ac8a5222ef1af1afe317e1b9",
+      "bytes": 1283126
+    },
+    {
+      "path": "/meiling/user-profile.js",
+      "sha256": "138b30cab42940d98f445d01ac11102fc43d0a63e3516e0d442cbfcbb3eedb13",
+      "bytes": 1457
+    },
+    {
+      "path": "/meiling/user-reference.png",
+      "sha256": "98886892dccb6c613ee612de853da5907e7e7e07910be22341e2bdce168ed19a",
+      "bytes": 192921
+    },
+    {
+      "path": "/meiling/voice-input.js",
+      "sha256": "38c8abdd9397028c5f10c9ef744f45fecf5719e227d347df1f02864d70738bd7",
+      "bytes": 2576
+    },
+    {
+      "path": "/meiling/voice-owner.js",
+      "sha256": "bb4ba47addd8018db4424a27b30543ce558da322524593bea3bb587734c08d4e",
+      "bytes": 13832
+    },
+    {
+      "path": "/meiling/wake-word.js",
+      "sha256": "5cda36aee281490496defaae92c745d7b6c44ad4d4dbb25c6023cd132aa0abb0",
+      "bytes": 1912
+    }
+  ]
+}

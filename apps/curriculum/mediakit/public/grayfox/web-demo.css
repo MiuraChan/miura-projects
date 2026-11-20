@@ -1,0 +1,7 @@
+.public-demo-toolbar { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; margin: -8px 0 24px; padding: 12px 0; border-bottom: 1px solid var(--gf-border); font-size: 13px; }
+.public-demo-toolbar a { color: var(--gf-red); text-decoration: none; font-weight: 600; }
+.public-demo-toolbar a:hover { text-decoration: underline; }
+.public-demo-toolbar p { flex: 1; min-width: 180px; margin: 0; color: var(--gf-text-secondary); }
+.public-sample-button { margin-top: 10px; }
+.web-demo textarea:disabled, .web-demo input:disabled { opacity: 1; cursor: not-allowed; color: var(--gf-text-secondary); background: var(--gf-bg); }
+@media(max-width: 600px) { .public-demo-toolbar { gap: 10px; margin-bottom: 16px; } .public-demo-toolbar p { order: 3; flex-basis: 100%; } .public-demo-toolbar button { margin-left: auto; } }

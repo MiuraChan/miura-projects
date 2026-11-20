@@ -1,7 +1,9 @@
 const DEFAULT_CONFIG = Object.freeze({
   calibrationMs: 240,
   speechStartMs: 160,
-  endSilenceMs: 1_600,
+  // Preserve a natural one-second breathing pause without making every
+  // completed turn wait an extra second and a half before transcription.
+  endSilenceMs: 1_350,
   noSpeechMs: 5_000,
   maxUtteranceMs: 30_000,
   sampleMs: 80,

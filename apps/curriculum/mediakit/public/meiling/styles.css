@@ -25,7 +25,7 @@ body{overflow:hidden;background:#000;font-family:CodecMono,monospace}
 .radio__bottom{bottom:3%;font-size:clamp(10px,2.1vw,23px);letter-spacing:.08em}
 .radio__rail{position:absolute;left:8%;width:84%;height:2px;background:rgba(86,142,123,.27);box-shadow:0 1px #000}
 .radio__rail--one{top:23%}.radio__rail--two{top:31%}.radio__rail--three{bottom:22%}
-.clock{position:absolute;top:39%;right:7%;color:var(--phosphor);font-family:"Courier New",monospace;font-size:clamp(28px,6.2vw,62px);font-weight:900;line-height:1;letter-spacing:-.09em;text-shadow:0 0 8px rgba(154,223,196,.35)}
+.codec-frequency{position:absolute;top:39%;right:5%;color:var(--phosphor);font-family:"Courier New",monospace;font-size:clamp(18px,4.7vw,48px);font-weight:900;line-height:1;letter-spacing:-.08em;text-shadow:0 0 8px rgba(154,223,196,.35)}
 .signal{position:absolute;left:8%;bottom:27%;display:flex;flex-direction:column-reverse;gap:clamp(2px,.45vw,5px);width:24%}
 .signal i{height:clamp(4px,.8vw,8px);background:var(--phosphor);clip-path:polygon(0 0,100% 0,88% 100%,0 100%)}
 .signal i:nth-child(1){width:100%}.signal i:nth-child(2){width:88%}.signal i:nth-child(3){width:76%}.signal i:nth-child(4){width:64%}.signal i:nth-child(5){width:52%}.signal i:nth-child(6){width:40%}.signal i:nth-child(7){width:28%}

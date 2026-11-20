@@ -15,6 +15,39 @@
 </head>
 <body>
   <main class="codec-stage" aria-label="MGS1 Codec">
+    <section
+      id="publicOnboarding"
+      class="codec-onboarding"
+      aria-labelledby="publicOnboardingTitle"
+      aria-describedby="publicOnboardingHint"
+      hidden
+    >
+      <form id="publicOnboardingForm" class="codec-onboarding__terminal" autocomplete="off">
+        <span class="codec-onboarding__eyebrow">FOXHOUND // USER REGISTRATION</span>
+        <h1 id="publicOnboardingTitle">DIGITA IL TUO NOME</h1>
+        <label class="sr-only" for="publicUserName">Nome operativo</label>
+        <div class="codec-onboarding__input-line">
+          <span aria-hidden="true">&gt;</span>
+          <input
+            id="publicUserName"
+            name="displayName"
+            type="text"
+            minlength="1"
+            maxlength="28"
+            inputmode="text"
+            enterkeyhint="go"
+            autocapitalize="words"
+            spellcheck="false"
+            required
+          />
+          <span class="codec-onboarding__cursor" aria-hidden="true"></span>
+        </div>
+        <p id="publicOnboardingHint">IL NOME RESTA SOLO IN QUESTA SCHEDA</p>
+        <p id="publicOnboardingError" class="codec-onboarding__error" role="alert" hidden></p>
+        <button type="submit">CONNETTI</button>
+      </form>
+      <span class="scanlines" aria-hidden="true"></span>
+    </section>
     <p id="publicDemoNotice" class="codec-demo-notice" hidden>
       PUBLIC DEMO // VOICE + TEXT + DAILY INTEL // NO PRIVATE MEMORY
     </p>
@@ -39,14 +72,18 @@
         <div class="signal" aria-hidden="true">
           <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
         </div>
-        <time id="clock" class="clock">19:03</time>
+        <output
+          id="codecFrequency"
+          class="codec-frequency"
+          aria-label="Frequenza Codec di salvataggio"
+        >140.96</output>
         <div class="radio__rail radio__rail--three"></div>
         <div class="radio__bottom">MEMORY</div>
         <span class="scanlines"></span>
       </section>
 
       <figure class="portrait portrait--miura" data-node-id="12:119" hidden aria-hidden="true">
-        <img class="portrait__image" src="./figma-miura-manga-approved.png" alt="Miura" />
+        <img id="userPortraitImage" class="portrait__image" src="./figma-miura-manga-approved.png" alt="Miura" />
         <span class="phosphor"></span>
         <span class="scanlines"></span>
       </figure>
@@ -129,6 +166,7 @@
     </aside>
 
     <p id="codecPanelStatus" class="sr-only" aria-live="polite"></p>
+    <p id="voiceEngineStatus" class="sr-only" aria-live="off"></p>
 
     <section id="codecTranscript" class="codec-transcript" hidden>
       <header class="codec-transcript__header">
@@ -163,6 +201,6 @@
     </section>
   </main>
   <script src="./voice-owner.js?v=10"></script>
-  <script type="module" src="./app.js?v=23"></script>
+  <script type="module" src="./app.js?v=38"></script>
 </body>
 </html>

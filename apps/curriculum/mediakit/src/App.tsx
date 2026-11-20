@@ -1,10 +1,7 @@
 // Francesco Saccullo — Mediakit 2026
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import imgPortrait from "@/imports/profile-photo.jpg";
 import imgContactPhoto from "@/imports/contact-photo.jpg";
-import imgMeiLing from "@/imports/mei-ling-prototype.png";
-import imgOtacon from "@/imports/otacon-current.png";
-import imgGrayfox from "@/imports/grayfox-prototype.png";
 
 type Route = "home" | "profile" | "projects" | "contact";
 
@@ -70,7 +67,7 @@ function IconArrow({ className = "w-4 h-4" }: { className?: string }) {
 // ── Data ───────────────────────────────────────────────────────────────────
 
 const skills = [
-  { label: "Design", note: "12 years designing interfaces people actually enjoy using." },
+  { label: "Design", note: "14 years designing interfaces people actually enjoy using." },
   { label: "Software Engineering", note: "React, TypeScript, Vite — clean components, zero cruft." },
   { label: "Product Management", note: "From brief to backlog to shipped." },
   { label: "AI Integration", note: "LLM pipelines, prompt engineering, agent tooling." },
@@ -79,16 +76,15 @@ const skills = [
   { label: "Design Systems", note: "" },
   { label: "Motion & Interaction", note: "" },
   { label: "Podcasting", note: "" },
-  { label: "Game Design", note: "" },
   { label: "Sound Design", note: "" },
 ];
 
 const experience = [
   { company: "INDEPENDENT PROJECTS", period: "2026–Present", role: "Software Engineer, Designer & AI Manager", location: "", note: "Developing next-generation AI-driven interfaces and product prototypes." },
-  { company: "JOBRAPIDO", period: "2022–2026", role: "Software Engineer", location: "Milan", note: "Built high-performance, responsive search applications with modern JavaScript frameworks." },
+  { company: "JOBRAPIDO", period: "2022–2026", role: "Software Engineer | Front-end Lead for three years", location: "Milan", note: "Served as Front-end Lead and sole front-end engineer for three years, with full responsibility for front-end design, architecture and development. Led technical decisions and built responsive search applications with modern JavaScript frameworks." },
   { company: "ENDO-FAP DON ORIONE", period: "2022–2023", role: "Lecturer, App Design & Development", location: "", note: "Lecturing and mentoring students on design principles and mobile architecture." },
   { company: "IDEGAMI", period: "2020–2023", role: "Designer & Software Engineer", location: "", note: "Designed cohesive digital design systems and engineered application code." },
-  { company: "HIBYE", period: "2017–2020", role: "Lead Software Engineer & Designer", location: "Milan", note: "Led software engineering, crafting elegant micro-interactions and component architectures." },
+  { company: "HIBYE", period: "2017–2020", role: "Lead Software Engineer & Designer", location: "Milan", note: "Took broad ownership of the project, combining front-end implementation with technical and design direction. Coordinated company leadership and the external backend provider, acting as the technical lead for shared decisions and front-end/backend integration. Developed component architectures and micro-interactions as part of the product experience." },
   { company: "ECRM ITALIA", period: "2015–2017", role: "Designer / Developer", location: "Milan", note: "Designed digital experiences at the intersection of interface and implementation." },
 ];
 
@@ -102,43 +98,32 @@ const tools: Tool[] = [
 
 const projects = [
   {
-    id: "manga",
-    number: "01",
-    title: "OTACON",
-    discipline: "TOOL / DESIGN SYSTEM / EDITORIAL",
-    description: "A title card generator inspired by the visual language of anime — a tool for giving recognisable identities to titles and content.",
-    color: "#164bce",
-    screenshot: imgOtacon,
-    screenshotAlt: "OTACON — anime title card tool showing heading, anime series tabs, card preview and layout buttons",
-    // Crop: source 4506×1286, content x=1697 y=109 w=1096 h=805, reshaped to 16:9 wrapper
-    wrapperStyle: { position: "relative", overflow: "hidden", aspectRatio: "16/9" } as React.CSSProperties,
-    imgStyle: { position: "absolute", width: "411.1314%", maxWidth: "none", height: "auto", left: "-154.8358%", top: "-17.68%", margin: 0 } as React.CSSProperties,
-  },
-  {
     id: "grayfox",
-    number: "02",
+    number: "01",
     title: "Grayfox",
+    caseStudy: [{label:"Problem",text:"Move from source footage to reviewable cuts and vertical clips without losing control of the output."},{label:"My contribution",text:"Product direction, design and software development, connecting editing workflows with AI assistance."},{label:"Decision and trade-off",text:"Keep browser video processing local and make export real. The bounded web demo supports short WebM exports; semantic event recognition and native editor integrations remain desktop features."},{label:"Try it",text:"Use the original sample video, adjust the edit and export a clip. The public demo has a 500 MB source limit and a 60-second selected-export limit."}],
+    href: "/grayfox/",
     discipline: "VIDEO EDITING / AI / PRODUCT",
     description: "A video editing environment that integrates cutting tools and AI assistance to work on the rhythm, tone and structure of content.",
     color: "#5e168f",
-    screenshot: imgGrayfox,
-    screenshotAlt: "Grayfox — video editing environment with mission selection, AI analysis, and timeline screens",
-    // Source 2048×798, content x=400..1955 y=205..697, centered in 16:9 wrapper
+    screenshot: "/grayfox-figma-workspace.png",
+    screenshotAlt: "Grayfox — current Figma design showing the Story clips workspace",
     wrapperStyle: { position: "relative", overflow: "hidden", aspectRatio: "16/9" } as React.CSSProperties,
-    imgStyle: { position: "absolute", width: "144.37%", maxWidth: "none", height: "auto", left: "-32.99%", top: "0", margin: 0 } as React.CSSProperties,
+    imgStyle: {"position":"absolute","width":"137.931%","maxWidth":"none","height":"auto","left":"-5.172%","top":"-21.456%","margin":0} as React.CSSProperties,
   },
   {
     id: "meiLing",
-    number: "03",
+    number: "02",
     title: "Mei Ling",
+    caseStudy: [{label:"Problem",text:"Make an AI assistant useful inside a creative workflow rather than leaving its suggestions in an isolated chat."},{label:"My contribution",text:"Interaction design, application development and AI integration for a codec-inspired assistant."},{label:"Decision and trade-off",text:"Separate the public guest session from private memory. Keep source-backed news distinct from evergreen ideas and show when current evidence is unavailable, instead of filling gaps with invented facts."},{label:"Try it",text:"Enter a guest name, ask a question in Italian or English and inspect the Intel panel. The public demo uses a dated RSS snapshot; its freshness and evidence limits remain visible."}],
     discipline: "DESKTOP ASSISTANT / AI / INTERFACE",
     description: "A desktop assistant with a codec-inspired interface, designed to make interactions with AI tools and workflows feel more personal.",
     href: "/meiling/",
     color: "#ff4b1f",
-    screenshot: imgMeiLing,
-    screenshotAlt: "Mei Ling — dark green tactical codec interface showing desktop and mobile layout",
+    screenshot: "/mei-ling-figma-codec.png",
+    screenshotAlt: "Mei Ling — connected desktop Codec exported from Figma",
     wrapperStyle: { position: "relative", overflow: "hidden", aspectRatio: "16/9" } as React.CSSProperties,
-    imgStyle: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" as const, objectPosition: "center" },
+    imgStyle: {"position":"absolute","inset":0,"width":"100%","height":"100%","objectFit":"contain","objectPosition":"center"} as React.CSSProperties,
   },
 ];
 
@@ -153,10 +138,13 @@ const navItems: Array<{ id: Route; label: string }> = [
 // ── App ────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [active, setActive] = useState<Route>("home");
+  const [active, setActive] = useState<Route>(() => ["profile", "projects", "contact"].includes(location.hash.slice(1).split("/")[0]) ? location.hash.slice(1).split("/")[0] as Route : "home");
   const [menuOpen, setMenuOpen] = useState(false);
 
+  useEffect(() => { const sync = () => { const route = location.hash.slice(1).split("/")[0]; setActive(["profile", "projects", "contact"].includes(route) ? route as Route : "home"); }; window.addEventListener("hashchange", sync); return () => window.removeEventListener("hashchange", sync); }, []);
+
   const go = (route: Route) => {
+    location.hash = route;
     setActive(route);
     setMenuOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -265,15 +253,13 @@ function PageHome({ onProjects }: { onProjects: () => void }) {
       {/* Hero copy */}
       <div className="relative py-14 md:py-20">
         <h1 className="font-['Archivo:ExtraBold',sans-serif] text-[clamp(2.8rem,8.5vw,7.8rem)] leading-[.84] tracking-[-.075em] text-[#121212]">
-          MANY DISCIPLINES.<br />
-          <span className="text-[#ff4b1f]">ONE DIGITAL</span><br />
-          MINDSET.
+          TECHNICAL VISION.<br />
+          <span className="text-[#ff4b1f]">HANDS-ON</span><br />
+          DELIVERY.
         </h1>
 
         <p className="mt-8 max-w-[580px] font-['Archivo:Regular',sans-serif] text-[clamp(1rem,1.6vw,1.2rem)] leading-relaxed text-[#121212]/80">
-          I'm Francesco Saccullo — a designer, developer, AI product manager and creator.
-          I bring visual craft, product thinking and technology together to turn ideas into
-          experiences, tools and content.
+          I'm Francesco Saccullo. I connect technical leadership, software development, design and AI integration. From architecture decisions to working interfaces, I turn a broad view of the product into concrete implementation choices.
         </p>
 
         {/* CTAs */}
@@ -297,7 +283,7 @@ function PageHome({ onProjects }: { onProjects: () => void }) {
       {/* Bottom strip */}
       <div className="relative flex flex-wrap items-end justify-between gap-4 border-t border-[#121212] pt-5">
         <div className="flex flex-wrap gap-x-8 gap-y-2">
-          {["Designer", "Developer", "AI Product Manager", "Creator"].map((role) => (
+          {["Technical leadership", "Software development", "Design", "AI integration"].map((role) => (
             <span key={role} className="font-['IBM_Plex_Mono:Regular',sans-serif] text-[10px] tracking-[.12em] text-[#121212]/50">
               {role.toUpperCase()}
             </span>
@@ -322,21 +308,11 @@ function PageProfile() {
           PROFILE
         </h2>
         <p className="font-['IBM_Plex_Mono:SemiBold',sans-serif] text-[10px] tracking-[.15em] text-[#ff4b1f]">
-          12 YEARS OF PRACTICE
+          14 YEARS OF PRACTICE
         </p>
       </div>
 
-      <div className="mb-8 flex justify-end">
-        <a
-          href="/Francesco-Saccullo_CV.pdf"
-          download="Francesco-Saccullo_CV.pdf"
-          className="inline-flex items-center gap-3 border border-[#121212] px-5 py-3 font-['IBM_Plex_Mono:SemiBold',sans-serif] text-[11px] tracking-[.1em] transition-colors hover:bg-[#121212] hover:text-[#f4efe6] focus-visible:outline-2 focus-visible:outline-offset-4"
-          aria-label="Download Francesco Saccullo CV as PDF"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" /></svg>
-          DOWNLOAD CV (PDF)
-        </a>
-      </div>
+      <div className="mb-8 flex flex-wrap justify-end gap-3"><a href="/Francesco-Saccullo_CV.pdf?v=20261103" download="Francesco-Saccullo_CV.pdf" className="inline-flex items-center gap-3 border border-[#121212] px-5 py-3 font-['IBM_Plex_Mono:SemiBold',sans-serif] text-[11px] tracking-[.1em] transition-colors hover:bg-[#121212] hover:text-[#f4efe6] focus-visible:outline-2 focus-visible:outline-offset-4" aria-label="Download Francesco Saccullo CV in English as PDF"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" /></svg>DOWNLOAD CV · EN (PDF)</a><a href="/Francesco-Saccullo_CV_IT.pdf?v=20261103" download="Francesco-Saccullo_CV_IT.pdf" className="inline-flex items-center gap-3 border border-[#121212] px-5 py-3 font-['IBM_Plex_Mono:SemiBold',sans-serif] text-[11px] tracking-[.1em] transition-colors hover:bg-[#121212] hover:text-[#f4efe6] focus-visible:outline-2 focus-visible:outline-offset-4" aria-label="Download Francesco Saccullo CV in Italian as PDF"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" /></svg>DOWNLOAD CV · IT (PDF)</a></div>
 
       {/* Photo + intro + skills grid */}
       <div className="grid gap-8 lg:grid-cols-[340px_1fr]">
@@ -384,7 +360,7 @@ function PageProfile() {
           <div className="flex flex-col gap-2">
             <p className="font-['IBM_Plex_Mono:SemiBold',sans-serif] text-[10px] tracking-[.18em] text-[#121212]/50">EXPERTISE</p>
             <p className="font-['Archivo:SemiBold',sans-serif] text-[13px] leading-relaxed">
-              DESIGN • SOFTWARE ENGINEERING • PRODUCT MANAGEMENT • AI • GAME DESIGN • PODCASTING
+              DESIGN • SOFTWARE DEVELOPMENT • TECHNICAL LEADERSHIP • PRODUCT • AI
             </p>
           </div>
         </div>
@@ -496,28 +472,18 @@ function PageProjects() {
           MY PROJECTS
         </h2>
         <p className="max-w-[340px] font-['Archivo:Regular',sans-serif] text-[14px] leading-snug text-[#121212]/70">
-          Three tools built with direction, design and AI-assisted development.
+          Professional case studies and independent tools: the context, my role and the decisions behind each piece of work.
         </p>
       </div>
 
-      {/* Process legend */}
-      <div className="mb-8 flex flex-wrap items-center gap-5 border border-[#121212]/15 bg-[#121212]/3 px-5 py-3.5">
-        <p className="font-['IBM_Plex_Mono:SemiBold',sans-serif] text-[9px] tracking-[.18em] text-[#121212]/50 mr-2">
-          PROCESS:
-        </p>
-        {tools.map((t) => (
-          <span key={t.label} className="flex items-center gap-1.5 font-['IBM_Plex_Mono:Regular',sans-serif] text-[10px] text-[#121212]/70">
-            <span className="text-[#121212]/50">{t.icon}</span>
-            {t.label}
-          </span>
-        ))}
-      </div>
-
+      <article className="mb-8 border border-[#121212]/20 p-6"><h3 className="text-2xl font-bold mb-3">Jobrapido / Modernising a legacy application incrementally</h3><p className="mb-3">Context: Jobrapido is a job-search platform. I worked there from 2022 to 2026, including three years as Front-end Lead and sole front-end engineer, responsible for front-end design, architecture and development. This case concerns the existing search application and how to evolve it while continuing product delivery.</p><p className="mb-3">A full rewrite was too expensive: it would interrupt delivery and require backend involvement. I chose to reserve a few hours within sprints, create a separate copy and start building Next.js components that could be introduced into the existing application gradually.</p><p className="mb-3">The trade-off was slower, incremental change instead of a disruptive replacement. New components began entering the existing product; I do not claim a completed migration or an unmeasured performance gain.</p></article>
+      <article className="mb-8 border border-[#121212]/20 p-6"><h3 className="text-2xl font-bold mb-3">HiBye / Owning delivery across design and development</h3><p className="mb-3">Context: At HiBye, from 2017 to 2020, I was Lead Software Engineer &amp; Designer with broad responsibility for the application project. I developed the front-end and directed its design and technical implementation; an external company provided the backend.</p><p className="mb-3">My role connected company leadership with the backend provider. I coordinated the parties as technical lead, bringing business decisions, front-end requirements and backend integration into the same delivery process.</p><p className="mb-3">Alongside that coordination, I built component architectures and micro-interactions. This case illustrates hands-on project ownership across design, development and external technical collaboration.</p></article>
       {/* Project cards */}
       <div className="flex flex-col gap-0 border-t border-[#121212]">
         {projects.map((project) => (
           <article
             key={project.id}
+            id={project.id}
             className="flex flex-col border-b border-[#121212] last:border-b-0 py-8 md:py-10"
           >
             {/* Top row: number + meta + description + badges */}
@@ -550,6 +516,7 @@ function PageProjects() {
                   {project.description}
                 </p>
 
+                <dl className="grid gap-4 sm:grid-cols-2">{project.caseStudy.map(item => <div key={item.label}><dt className="text-sm font-bold mb-1">{item.label}</dt><dd className="text-sm leading-relaxed text-[#121212]/80">{item.text}</dd></div>)}</dl>
                 {/* Tool badges */}
                 <div className="flex flex-wrap gap-2">
                   {tools.map((t) => (
@@ -568,7 +535,7 @@ function PageProjects() {
                     href={project.href}
                     className="group inline-flex w-fit items-center gap-3 border border-[#121212] px-4 py-2.5 font-['IBM_Plex_Mono:SemiBold',sans-serif] text-[10px] tracking-[.12em] transition-colors hover:bg-[#121212] hover:text-[#f4efe6]"
                   >
-                    OPEN LIVE PROTOTYPE
+                    OPEN LIVE DEMO
                     <IconArrow className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                   </a>
                 ) : null}
@@ -689,13 +656,13 @@ function PageContact() {
             so here I am
           </h3>
           <p className="font-['Archivo:Regular',sans-serif] text-[clamp(1rem,1.5vw,1.15rem)] leading-relaxed text-[#121212]/80">
-            I'm a multi-skilled digital professional. In 14 years, I've never found a single way to define myself or a place where I truly belong in the business world.
+            My work connects design, software development and product decisions. I bring 14 years of practice and hands-on technical ownership, including three years as Front-end Lead at Jobrapido.
           </p>
           <p className="font-['Archivo:Regular',sans-serif] text-[clamp(1rem,1.5vw,1.15rem)] leading-relaxed text-[#121212]/80">
-            AI is helping me bring my skills together and show more clearly what I'm capable of and the value I can add to the projects I work on.
+            I use AI integration to build usable tools, with clear limits and reviewable outputs. My independent projects make these choices tangible: try the demos and inspect the trade-offs below.
           </p>
           <p className="font-['Archivo:Regular',sans-serif] text-[clamp(1rem,1.5vw,1.15rem)] leading-relaxed text-[#121212]/80">
-            My dream is to work in the gaming industry. I hope to get there one day.
+            I am looking for opportunities in technical leadership, senior software development, AI applications and AI design, with Italy as my first preference and Europe as my wider search area.
           </p>
         </div>
 

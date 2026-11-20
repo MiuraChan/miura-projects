@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 720" role="img" aria-labelledby="title desc">
+  <title id="title">Laughing operative</title>
+  <desc id="desc">Minimal anonymous human outline with an open laughing mouth.</desc>
+  <rect width="480" height="720" fill="#020706"/>
+  <g fill="none" stroke="#a8ead1" stroke-linecap="round" stroke-linejoin="round">
+    <path stroke-width="7" d="M87 720c8-74 30-123 70-153 21-16 49-27 83-35 34 8 62 19 83 35 40 30 62 79 70 153"/>
+    <path stroke-width="8" d="M154 252c0-83 37-134 86-134s86 51 86 134v78c0 77-38 138-86 138s-86-61-86-138Z"/>
+    <path stroke-width="5" d="M154 277c-16 1-26 17-24 39 2 23 13 39 31 39m165-78c16 1 26 17 24 39-2 23-13 39-31 39" opacity=".75"/>
+    <path stroke-width="6" d="M154 247c17-15 28-35 34-60 18 18 45 30 82 36 19 3 38 10 56 24" opacity=".86"/>
+    <path stroke-width="4" d="M199 363c12 8 26 12 41 12s29-4 41-12" opacity=".48"/>
+    <path stroke-width="7" d="M191 379c13-13 30-20 49-20s36 7 49 20c-6 42-24 63-49 63s-43-21-49-63Z"/>
+    <path stroke-width="4" d="M204 383c24 9 48 9 72 0M211 417c18-8 38-8 57 0" opacity=".82"/>
+    <path stroke-width="5" d="M183 406c-11 1-21 7-29 17m143-17c11 1 21 7 29 17" opacity=".58"/>
+    <path stroke-width="5" d="M211 468v61m58-61v61M154 570c21 34 50 53 86 53s65-19 86-53" opacity=".65"/>
+  </g>
+  <g fill="#a8ead1" opacity=".34">
+    <rect x="29" y="42" width="4" height="242"/>
+    <rect x="447" y="436" width="4" height="242"/>
+    <rect x="29" y="42" width="74" height="4"/>
+    <rect x="377" y="674" width="74" height="4"/>
+  </g>
+</svg>

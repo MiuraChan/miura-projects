@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gray Fox — Web Demo | Mediakit</title>
+    <base href="/grayfox/" />
+    <meta name="description" content="Try Gray Fox: local browser video cuts, vertical clips and real WebM exports. No account or video uploads. AI content recognition is a desktop feature." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2710%27 fill=%27%23c41e1e%27/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./web-demo.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand" data-testid="grayfox-brand">
+          <span class="brand-signal" role="status" aria-label="Gray Fox active"></span>
+          <span>GRAY FOX</span>
+        </div>
+
+        <nav class="nav" aria-label="Primary navigation">
+          <button class="nav-item active" data-view="shorts">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <rect x="7" y="2.5" width="10" height="19" rx="2" />
+                <path d="M10 5h4M11 18.5h2" />
+              </svg>
+            </span>
+            Story Clips
+          </button>
+          <button class="nav-item" data-view="video-ops">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <rect x="3" y="6" width="13" height="12" rx="2" />
+                <circle cx="9.5" cy="12" r="3" />
+                <path d="m16 10 5-2v8l-5-2" />
+              </svg>
+            </span>
+            Video Ops
+          </button>
+        </nav>
+
+        <div class="recent">
+          <div class="eyebrow">RECENT</div>
+          <div id="recent-projects">
+            <p class="recent-empty">Your saved work will appear here.</p>
+          </div>
+        </div>
+
+        <div class="profile">
+          <span class="avatar" id="workspace-avatar">
+            <img id="workspace-avatar-image" alt="" hidden />
+            <span id="workspace-avatar-initials">GF</span>
+          </span>
+          <span>
+            <strong id="workspace-name">My workspace</strong>
+            <small id="workspace-location">Choose export folder</small>
+          </span>
+          <button class="icon-button" id="workspace-settings" aria-label="Workspace settings">•••</button>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="section-label">VERTICAL CLIP STUDIO</p>
+            <h1 id="page-title">Story Clips</h1>
+          </div>
+          <div class="web-demo-banner" id="web-demo-banner" hidden role="status">
+            <strong>DEMO WEB</strong>
+            <span>Full Gray Fox runs on desktop. Browser limitations are simulated or clearly labeled.</span>
+          </div>
+          <div class="top-actions">
+            <span class="status-pill"><i class="live-signal"></i> Session active</span>
+            <button class="secondary-button" id="export-button">Save</button>
+          </div>
+        </header>
+
+        <section class="view" id="video-ops">
+          <div class="editor-grid">
+            <section class="canvas-card">
+              <div class="video-stage" id="video-stage">
+                <video id="video-preview" controls playsinline></video>
+                <button class="preview-action" id="replace-video" type="button" hidden>Replace video</button>
+                <button class="empty-state" id="empty-state" type="button">
+                  <span class="upload-signal" aria-hidden="true"></span>
+                  <h2>Bring in your long-form video</h2>
+                  <p>Click anywhere here or drop a file from your PC.</p>
+                  <small>MP4, MOV, WebM · processed on this device</small>
+                </button>
+              </div>
+              <input type="file" id="video-input" accept="video/*,.mkv,.mov,.mp4,.webm,.m4v,.avi" hidden />
+              <input id="trim-start" type="hidden" value="0" />
+              <input id="trim-end" type="hidden" value="0" />
+            </section>
+
+            <aside class="ai-panel">
+              <div class="panel-heading">
+                <span class="brand-signal brief-signal" role="status" aria-label="Gray Fox assistant active"></span>
+                <div>
+                  <h2>Edit brief</h2>
+                  <p>Set the range and describe the result you want.</p>
+                </div>
+              </div>
+
+              <div class="context-strip">
+                <span class="context-label">PROJECT</span>
+                <label class="project-name-shell" for="project-name">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16-.8 4 4-.8L18.8 7.6l-3.2-3.2L4 16Z"/><path d="m13.9 6.1 3.2 3.2"/></svg>
+                  <input id="project-name" value="Untitled edit" maxlength="80" aria-label="Project name" />
+                </label>
+                <span class="context-meta">Draft 01</span>
+              </div>
+
+              <div class="field-group">
+                <div class="label-with-help">
+                  <label for="final-use">Final use</label>
+                  <button class="help-button" type="button" data-help-title="Final use" data-help="Tell Gray Fox where the video will live. It uses this to choose pacing, framing, and the right ending." aria-label="Explain final use"><span>?</span></button>
+                </div>
+                <select id="final-use">
+                  <option>YouTube</option>
+                  <option>Website / landing page</option>
+                  <option>Internal presentation</option>
+                  <option>Paid social campaign</option>
+                  <option>Event highlight</option>
+                </select>
+              </div>
+
+              <div class="field-group">
+                <div class="label-with-help">
+                  <span class="field-label">Duration window</span>
+                  <button class="help-button" type="button" data-help-title="Duration window" data-help="Minimum is the shortest acceptable cut. Maximum is a hard ceiling. Gray Fox may finish anywhere inside this window and never derives these limits from the direction text." aria-label="Explain duration window"><span>?</span></button>
+                </div>
+                <div class="duration-range">
+                  <label for="minimum-minutes"><span>Minimum</span><input class="standard-input" id="minimum-minutes" type="number" min="0.1" step="0.5" inputmode="decimal" placeholder="e.g. 2" /></label>
+                  <span class="duration-range-divider" aria-hidden="true">–</span>
+                  <label for="maximum-minutes"><span>Maximum</span><input class="standard-input" id="maximum-minutes" type="number" min="0.1" step="0.5" inputmode="decimal" placeholder="e.g. 30" /></label>
+                </div>
+                <p class="field-help" id="duration-range-help">Both values are required. Written directions cannot override this range.</p>
+              </div>
+
+              <div class="field-group">
+                <label for="source-aspect">Source content</label>
+                <select id="source-aspect">
+                  <option value="full">Full recording</option>
+                  <option value="21:9">Centered 21:9 gameplay area</option>
+                  <option value="32:9">Centered 32:9 gameplay area</option>
+                </select>
+                <div class="label-with-help"><label for="edit-framing">Output · 1920 × 1080</label><button class="help-button" type="button" data-help-title="Output framing" data-help="Fit keeps the entire selected image, centered with black bars if needed. Fill crops the center to 16:9. Source content can exclude stream decorations around a centered ultrawide game. The image is never stretched." aria-label="Explain output framing"><span>?</span></button></div>
+                <select id="edit-framing"><option value="fit">Fit full image · no cropping</option><option value="crop">Fill 16:9 · center crop</option></select>
+              </div>
+
+              <div class="field-group token-field">
+                <div class="label-row">
+                  <div class="label-with-help">
+                    <label for="tone-token">Tone tokens</label>
+                    <button class="help-button" type="button" data-help-title="Tone tokens" data-help="Add up to six words that describe how the edit should feel. Gray Fox uses them to choose cut density, shot length and silence trimming." aria-label="Explain tone tokens"><span>?</span></button>
+                  </div>
+                  <span class="optional" id="tone-token-count">0 / 6 tags</span>
+                </div>
+                <p class="field-help">These tags change measurable editing decisions; the applied profile is shown with the rendered cut.</p>
+                <div class="token-input-shell" id="token-shell">
+                  <div id="token-list"></div>
+                  <input id="tone-token" type="text" placeholder="Type a token and press Enter" autocomplete="off" />
+                </div>
+                <div class="suggestion-row">
+                  <button class="token-suggestion">Warm</button>
+                  <button class="token-suggestion">Premium</button>
+                  <button class="token-suggestion">Energetic</button>
+                  <button class="token-suggestion">Direct</button>
+                </div>
+                <div class="tone-effect" id="tone-effect">
+                  <span>Pace</span><i></i><span>Shot length</span><i></i><span>Silence</span>
+                </div>
+              </div>
+
+              <div class="field-group grow">
+                <div class="label-with-help">
+                  <label for="direction">Editing direction</label>
+                  <button class="help-button" type="button" data-help-title="Editing direction" data-help="Write the result you want, not editing commands. Mention the audience, strongest moment, and what viewers should feel or do." aria-label="Explain editing direction"><span>?</span></button>
+                </div>
+                <textarea id="direction" placeholder="Example: Make this feel confident and concise. Open with the customer result, remove pauses, and finish on the product reveal."></textarea>
+                <div class="dialogue-source"><button class="secondary-button compact-button" id="choose-transcript" type="button">Attach transcript</button><span id="dialogue-source-status">Auto-detect embedded or matching .srt/.vtt</span></div>
+              </div>
+
+              <div class="brief-card">
+                <span>SESSION BRIEF</span>
+                <p id="brief-copy">Add a video and directions to build your editing brief.</p>
+              </div>
+
+              <div class="cut-action" id="cut-action">
+                <fieldset class="fade-options">
+                  <legend>Automatic edit</legend>
+                  <label><input type="checkbox" id="fade-in" /> Fade in · 0.5 sec</label>
+                  <label><input type="checkbox" id="fade-out" /> Fade out · 0.5 sec</label>
+                  <small>Join the selected cuts. Fades affect only the opening and ending.</small>
+                </fieldset>
+                <div class="button-with-help">
+                  <button class="primary-button full" id="create-cut">
+                    <span>✦</span> Create automatic edit
+                  </button>
+                  <button class="help-button help-button-on-dark" type="button" data-help-title="First cut" data-help="Gray Fox builds a real multi-segment timeline from visible moments, scene changes and audio pauses, then concatenates the selected pieces into a new MP4. Your original file is never changed." aria-label="Explain first cut"><span>?</span></button>
+                </div>
+                <div class="processing-panel" id="processing-panel" hidden aria-live="polite">
+                  <div class="processing-head">
+                    <strong id="processing-title">Creating your first cut</strong>
+                    <span id="processing-eta">Estimating…</span>
+                  </div>
+                  <div class="progress-track" role="progressbar" aria-label="First cut progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <span id="processing-bar"></span>
+                  </div>
+                  <p id="processing-curiosity">Gray Fox is reading the rhythm of your source video.</p>
+                  <div class="edit-plan-summary" id="edit-plan-summary" hidden></div>
+                </div>
+              </div>
+
+              <section class="review-panel" id="review-panel" hidden aria-live="polite">
+                <div class="review-heading">
+                  <div><span class="eyebrow">FIRST CUT REVIEW</span><strong id="review-status">Decision required</strong></div>
+                  <span class="cut-count" id="cut-count">0 cuts</span>
+                </div>
+                <p id="review-summary">Watch the rendered cut, then approve it or request a revision.</p>
+                <div class="cut-review-list" id="cut-review-list" aria-label="Cuts in this edit"></div>
+                <div class="review-actions">
+                  <button class="primary-button" id="approve-cut" type="button">Approve cut</button>
+                  <button class="secondary-button" id="request-changes" type="button">Needs changes</button>
+                </div>
+                <div class="revision-box" id="revision-box" hidden>
+                  <label for="revision-notes">What should Gray Fox change?</label>
+                  <textarea id="revision-notes" placeholder="Example: Keep the complete answer about pricing, remove the repeated introduction, and end after the call to action."></textarea>
+                  <button class="secondary-button" id="render-revision" type="button">Render revision</button>
+                </div>
+                <div class="handoff-panel" id="handoff-panel" hidden>
+                  <label for="export-format">Save the exact approved cut</label>
+                  <div class="handoff-row">
+                    <select id="export-format">
+                      <option value="mp4">MP4 · H.264/AAC</option>
+                      <option value="mov-prores">MOV · ProRes 422 HQ/PCM</option>
+                      <option value="webm">WebM · VP9/Opus</option>
+                    </select>
+                    <button class="primary-button" id="save-approved-format" type="button">Save format</button>
+                  </div>
+                  <small id="format-export-status">Choose a format; Gray Fox saves the reviewed video without rebuilding its edit decisions.</small>
+                  <button class="secondary-button export-more-button" id="toggle-handoff-options" type="button" aria-expanded="false" aria-controls="handoff-secondary">Other destinations <span aria-hidden="true">＋</span></button>
+                  <div class="handoff-secondary" id="handoff-secondary" hidden>
+                    <div class="handoff-divider" aria-hidden="true"></div>
+                    <label for="handoff-target">Premiere, After Effects or social package</label>
+                    <div class="handoff-row">
+                      <select id="handoff-target">
+                        <option value="premiere">Adobe Premiere Pro XML</option>
+                        <option value="after-effects">After Effects script</option>
+                        <option value="youtube">YouTube publishing package</option>
+                        <option value="tiktok">TikTok publishing package</option>
+                        <option value="instagram">Instagram publishing package</option>
+                      </select>
+                      <button class="secondary-button" id="create-handoff" type="button">Create package</button>
+                    </div>
+                    <small id="handoff-status">Optional: Gray Fox prepares the approved edit; you confirm the final import or post.</small>
+                  </div>
+                </div>
+              </section>
+              <p class="privacy-note">Video stays on this device. Dialogue analysis uses embedded subtitles or an available local speech recognizer; Gray Fox reports the source it used.</p>
+            </aside>
+          </div>
+        </section>
+
+        <section class="view active" id="shorts">
+          <div class="shorts-layout">
+            <div class="shorts-intro">
+              <span class="eyebrow">LOCAL VISION RANKING</span>
+              <h2>Find your strongest clips.</h2>
+              <p>Load a video here. Gray Fox selects complete moments from your directions and saves them as separate clips.</p>
+              <button class="story-upload" id="story-upload" type="button">
+                <strong>Choose video</strong>
+                <span id="story-source" aria-live="polite">Click to choose a file, or drop a video here.</span>
+              </button>
+              <div class="shorts-settings">
+                <div class="field-group">
+                  <div class="label-with-help">
+                    <label for="short-length">Target length</label>
+                    <button class="help-button" type="button" data-help-title="Target length" data-help="Choose the ideal range. Gray Fox keeps the thought complete even when a strong moment runs slightly longer." aria-label="Explain target length"><span>?</span></button>
+                  </div>
+                  <select id="short-length">
+                    <option>30–45 seconds</option>
+                    <option>15–30 seconds</option>
+                    <option>45–60 seconds</option>
+                  </select>
+                </div>
+                <div class="field-group">
+                  <div class="label-with-help">
+                    <label>Platform</label>
+                    <button class="help-button" type="button" data-help-title="Platform" data-help="The destination changes safe areas, caption placement, and the rhythm used for the opening hook." aria-label="Explain platform"><span>?</span></button>
+                  </div>
+                  <div class="segmented">
+                    <button class="active">TikTok</button>
+                    <button>Reels</button>
+                    <button>Shorts</button>
+                  </div>
+                </div>
+                <div class="field-group">
+                  <div class="label-with-help">
+                    <label for="short-tone-token">Tone tokens</label>
+                    <button class="help-button" type="button" data-help-title="Story clip tone" data-help="Describe which moments feel right for your voice, such as bold, funny, candid, or helpful." aria-label="Explain story clip tone"><span>?</span></button>
+                  </div>
+                  <input id="short-tone-token" class="standard-input" placeholder="e.g. bold, helpful, candid" />
+                </div>
+                <div class="field-group">
+                  <div class="label-with-help"><label for="short-framing">Vertical output · 1080 × 1920</label><button class="help-button" type="button" data-help-title="Vertical framing" data-help="All Story Clips export in 9:16. Fit preserves the full gameplay image on a blurred background. Fill crops the center to fill the vertical frame. No stretching. For an ultrawide game inside a stream layout, select its centered gameplay area below." aria-label="Explain vertical framing"><span>?</span></button></div>
+                  <select id="short-framing"><option value="crop">Fill 9:16 · center crop</option><option value="fit">Full image + blurred background</option></select>
+                  <label for="short-source-aspect">Source content</label>
+                  <select id="short-source-aspect"><option value="full">Full recording</option><option value="21:9">Centered 21:9 gameplay area</option><option value="32:9">Centered 32:9 gameplay area</option></select>
+                </div>
+                <div class="field-group">
+                  <div class="label-with-help">
+                    <label for="short-direction">Clip directions</label>
+                    <button class="help-button" type="button" data-help-title="Clip directions" data-help="Describe which moments to find or avoid. For player deaths, Gray Fox locates the death-state screen, groups repeated frames into one event, and includes action before it and aftermath with original audio after it. A verified recurring graphic is matched throughout this source. No matching event means no unrelated export." aria-label="Explain story clip directions"><span>?</span></button>
+                  </div>
+                  <textarea id="short-direction" class="short-direction" placeholder="Example: Save complete explanations, skip loading screens and repeated introductions."></textarea>
+                </div>
+                <div class="evaluation-grid">
+                  <div><span>Source</span><strong>Real duration</strong></div>
+                  <div><span>Output</span><strong>9:16 · 1080 × 1920</strong></div>
+                </div>
+                <div class="button-with-help">
+                  <button class="primary-button full" id="find-moments">Find and save clips</button>
+                  <button class="help-button help-button-on-dark" type="button" data-help-title="Best moments" data-help="Gray Fox selects several complete moments from your instructions. On desktop you choose a folder for each batch. In the web demo, files are downloaded by your browser." aria-label="Explain best moments"><span>?</span></button>
+                </div>
+                <p class="field-help" id="story-selection-status" role="status" aria-live="polite">Specific instructions are required content filters. No verified match means no unrelated export.</p>
+              </div>
+            </div>
+
+            <div class="candidate-panel">
+              <div class="candidate-header">
+                <div>
+                  <span class="eyebrow">SUGGESTED CLIPS</span>
+                  <h3>Top moments</h3>
+                </div>
+                <span class="score-key">Edit score</span>
+              </div>
+              <div class="candidate-list" id="candidate-list">
+                <div class="candidate empty-candidate">
+                  <div class="candidate-placeholder">✦</div>
+                  <p>Upload a video, then Gray Fox will find and save several complete clips automatically.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="help-popover" id="help-popover" hidden role="dialog" aria-labelledby="help-title">
+      <button class="help-close" id="help-close" aria-label="Close explanation">×</button>
+      <span class="eyebrow">GRAY FOX GUIDE</span>
+      <h3 id="help-title">How it works</h3>
+      <p id="help-copy"></p>
+      <button class="speak-button" id="speak-help" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9v6h4l5 4V5L9 9H5Z"/><path d="M17 9c1.4 1.6 1.4 4.4 0 6M19.5 6.5c3 3 3 8 0 11"/></svg>
+        Listen
+      </button>
+    </div>
+
+    <div class="modal-backdrop" id="workspace-modal" hidden>
+      <section class="workspace-modal-card" role="dialog" aria-modal="true" aria-labelledby="workspace-modal-title">
+        <button class="modal-close" id="workspace-close" type="button" aria-label="Close workspace settings" hidden>×</button>
+        <span class="modal-brand-mark brand-signal" role="status" aria-label="Gray Fox active"></span>
+        <p class="eyebrow">LOCAL WORKSPACE</p>
+        <h2 id="workspace-modal-title">Hi! My codename is Gray Fox.</h2>
+        <p class="modal-intro">I need your name and a folder where to put my work.</p>
+        <div class="profile-image-manager">
+          <div class="profile-image-preview" id="profile-image-preview">
+            <img id="profile-image-preview-image" alt="" hidden />
+            <span id="profile-preview-initials">GF</span>
+          </div>
+          <div>
+            <strong>Profile image</strong>
+            <p>Choose a JPG, PNG, or WebP image up to 2 MB.</p>
+            <div class="profile-image-actions">
+              <button class="secondary-button compact-button" id="choose-profile-image" type="button">Choose image</button>
+              <button class="text-button" id="remove-profile-image" type="button" hidden>Remove</button>
+            </div>
+            <p class="profile-image-status" id="profile-image-status" role="status" aria-live="polite"></p>
+          </div>
+        </div>
+        <div class="field-group">
+          <label for="workspace-user-name">Your name</label>
+          <input class="standard-input" id="workspace-user-name" autocomplete="name" placeholder="e.g. Marco" />
+        </div>
+        <div class="field-group">
+          <label for="workspace-export-path">Export folder</label>
+          <div class="path-picker">
+            <input class="standard-input" id="workspace-export-path" readonly placeholder="Choose a folder on this PC" />
+            <button class="secondary-button" id="choose-export-path" type="button">Choose folder</button>
+          </div>
+          <small class="selected-export-path" id="selected-export-path" hidden></small>
+          <small class="browser-folder-help" id="browser-folder-help" hidden></small>
+        </div>
+        <p class="modal-error" id="workspace-error" role="alert"></p>
+        <button class="primary-button full" id="create-workspace" type="button">Start session</button>
+        <p class="privacy-note modal-privacy">Temporary session: name, folder, image, and projects are not saved after Gray Fox closes.</p>
+      </section>
+    </div>
+
+    <input type="file" id="profile-image-input" accept="image/*" hidden />
+    <div class="toast" id="toast" role="status"></div>
+    <script src="./media-layout.js"></script>
+    <script src="./web-bridge.js"></script>
+    <script src="./app.js"></script>
+    <script src="./web-demo.js"></script>
+  </body>
+</html>

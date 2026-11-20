@@ -4,17 +4,38 @@ import {
   classifyMicrophoneError,
   hasUsableAudioTrack,
   shouldRearmLocalRecorder,
+  shouldPreferBrowserRecognition,
+  shouldRetryConversationListening,
+  compactSpokenReply,
 } from "./voice-input.js";
 import {
   describeRuntimeConnection,
   describeRuntimeHealth,
 } from "./runtime-readiness.js";
-import { normalizeNewsResults } from "./news-result.js";
+import { normalizeNewsResults, safeNewsUrl } from "./news-result.js";
+import {
+  PRIVATE_USER_NAME,
+  createPublicUserProfile,
+  readPublicUserProfile,
+  storePublicUserProfile,
+} from "./user-profile.js";
+import {
+  armEditorialFallbackWindow,
+  classifyEditorialTurn,
+  createEditorialFlowState,
+  markEditorialPlanDelivered,
+  markEditorialPlanFailed,
+  scheduleTimedEditorialFallback,
+} from "./editorial-flow.js?v=38";
+import {
+  normalizeSupportedLanguage,
+  resolveSupportedLanguage,
+} from "./language.js?v=38";
 
 const codec = document.querySelector(".codec");
-const clock = document.querySelector("#clock");
 const meiPortrait = document.querySelector(".portrait--mei");
 const miuraPortrait = document.querySelector(".portrait--miura");
+const userPortraitImage = document.querySelector("#userPortraitImage");
 const meiPortraitImage = document.querySelector("#meiPortraitImage");
 const transcript = document.querySelector("#codecTranscript");
 const transcriptSpeaker = document.querySelector("#transcriptSpeaker");
@@ -32,6 +53,7 @@ const panelClose = document.querySelector("#codecPanelClose");
 const panelRefresh = document.querySelector("#codecPanelRefresh");
 const panelTitle = document.querySelector("#codecPanelTitle");
 const panelStatus = document.querySelector("#codecPanelStatus");
+const voiceEngineStatus = document.querySelector("#voiceEngineStatus");
 const panelSwipeGrip = document.querySelector("#codecPanelSwipeGrip");
 const panelTabs = [...document.querySelectorAll("[data-panel-tab]")];
 const panelSections = [...document.querySelectorAll("[data-panel-section]")];
@@ -41,13 +63,18 @@ const memoryContent = document.querySelector("#memoryContent");
 const wakeToggle = document.querySelector("#wakeToggle");
 const wakeToggleLabel = document.querySelector("#wakeToggleLabel");
 const publicDemoNotice = document.querySelector("#publicDemoNotice");
+const publicOnboarding = document.querySelector("#publicOnboarding");
+const publicOnboardingForm = document.querySelector("#publicOnboardingForm");
+const publicUserNameInput = document.querySelector("#publicUserName");
+const publicOnboardingError = document.querySelector("#publicOnboardingError");
 
 const assetUrl = (path) => new URL(String(path || "").replace(/^\/+/, ""), import.meta.url).href;
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const canRecordAudio = Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
 const browserLanguage = (navigator.languages?.[0] || navigator.language || "it-IT").toLowerCase();
 const sessionId = crypto.randomUUID?.() || `mei-${Date.now()}`;
-const CLIENT_VERSION = "10";
+const CLIENT_VERSION = "11";
 const codecRing = new Audio(assetUrl("audio/metal-gear-codec.mp3"));
 const codecDisconnect = new Audio(assetUrl("audio/codec-disconnect.wav"));
 const activeRequests = new Set();
@@ -69,7 +96,9 @@ const knownPhantomInputs = new Set([
   "www mooji org",
   "miura mei ling twitch youtube instagram kojima fromsoftware",
 ]);
-const LISTEN_AFTER_SPEECH_MS = 480;
+const LISTEN_AFTER_SPEECH_MS = 160;
+const LISTEN_RETRY_MS = 220;
+const LISTEN_RETRY_ATTEMPTS = 12;
 const CODEC_RING_SAFETY_MS = 16_500;
 const WAKE_PREFERENCE_KEY = "mei-ling-wake-enabled-v8";
 const RUNTIME_HEALTH_RETRY_MS = 1_100;
@@ -88,6 +117,56 @@ let appConfig = {
     proactiveCalls: true,
   },
 };
+let currentUserProfile = createPublicUserProfile(PRIVATE_USER_NAME);
+let publicIdentityReady = true;
+
+function currentUserName() {
+  return currentUserProfile?.name || PRIVATE_USER_NAME;
+}
+
+function currentUserLabel() {
+  return currentUserProfile?.label || PRIVATE_USER_NAME.toLocaleUpperCase("it-IT");
+}
+
+function clientAiUserContext() {
+  return {
+    userName: currentUserName(),
+    isMiuraProfile: Boolean(currentUserProfile?.isMiura),
+    language: currentConversationLanguage(),
+  };
+}
+
+function applyPublicUserProfile(profile) {
+  if (!profile) return false;
+  currentUserProfile = profile;
+  publicIdentityReady = true;
+  if (userPortraitImage) {
+    userPortraitImage.src = assetUrl(profile.avatar);
+    userPortraitImage.alt = profile.isMiura ? "Miura" : `Avatar operativo di ${profile.name}`;
+  }
+  miuraPortrait.dataset.userProfile = profile.isMiura ? "miura" : "guest";
+  miuraPortrait.setAttribute("aria-label", profile.isMiura ? "Miura" : `Operativo ${profile.name}`);
+  document.body.dataset.publicIdentity = profile.isMiura ? "miura" : "guest";
+  return true;
+}
+
+function showPublicOnboarding(message = "") {
+  if (!appConfig.publicDemo || !publicOnboarding) return;
+  publicIdentityReady = false;
+  publicOnboarding.hidden = false;
+  document.body.dataset.onboarding = "required";
+  if (publicOnboardingError) {
+    publicOnboardingError.textContent = message;
+    publicOnboardingError.hidden = !message;
+  }
+  window.requestAnimationFrame(() => publicUserNameInput?.focus());
+}
+
+function hidePublicOnboarding() {
+  if (!publicOnboarding) return;
+  publicOnboarding.hidden = true;
+  delete document.body.dataset.onboarding;
+}
 
 async function loadAppConfig() {
   try {
@@ -108,7 +187,7 @@ async function loadAppConfig() {
         ...appConfig.capabilities,
         memory: false,
         voice: true,
-        microphone: Boolean(SpeechRecognition),
+        microphone: Boolean(SpeechRecognition || canRecordAudio),
         wakeWord: false,
         proactiveCalls: false,
       },
@@ -123,6 +202,18 @@ async function loadAppConfig() {
   const memorySection = panelSections.find((section) => section.dataset.panelSection === "memory");
   if (memoryTab) memoryTab.hidden = true;
   if (memorySection) memorySection.hidden = true;
+  const storedProfile = readPublicUserProfile();
+  if (storedProfile) {
+    applyPublicUserProfile(storedProfile);
+    hidePublicOnboarding();
+  } else {
+    currentUserProfile = createPublicUserProfile("Operative");
+    if (userPortraitImage) {
+      userPortraitImage.src = assetUrl(currentUserProfile.avatar);
+      userPortraitImage.alt = "Avatar operativo neutro";
+    }
+    showPublicOnboarding();
+  }
 }
 
 codecRing.preload = "auto";
@@ -158,7 +249,7 @@ let busy = false;
 let recognition = null;
 let recognitionActive = false;
 let recognitionBlocked = !SpeechRecognition;
-let recognitionLanguage = browserLanguage.startsWith("en") ? "en-US" : "it-IT";
+let recognitionLanguage = document.documentElement.lang.startsWith("en") ? "en-US" : "it-IT";
 let recognitionRestartTimer = null;
 let callTimer = null;
 let ringSafetyTimer = null;
@@ -169,6 +260,8 @@ let currentSpeechUtterance = null;
 let speechFallbackActive = false;
 let speechEpoch = 0;
 let currentSpeechCancel = null;
+let currentSpeechAbortController = null;
+let currentTurnAbortController = null;
 let lastFinalTranscript = "";
 let microphoneStream = null;
 let microphonePromise = null;
@@ -201,6 +294,11 @@ let panelReturnFocus = null;
 let suppressPanelClickUntil = 0;
 let latestDebrief = null;
 let latestDebriefError = "";
+let latestEditorialPlan = null;
+let pendingEditorialRevealKey = "";
+let editorialRevealFrame = 0;
+let editorialFlowState = createEditorialFlowState();
+let editorialFallbackSchedule = null;
 let liveDebriefTimer = 0;
 let liveDebriefSequence = 0;
 let panelData = {
@@ -250,14 +348,6 @@ window.applyMeiReply = (payload) => {
   setMeiExpression(payload?.expression || "neutral");
   return payload?.reply || "";
 };
-
-function updateClock() {
-  clock.textContent = new Intl.DateTimeFormat("it-IT", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date());
-}
 
 function syncPortraitState(state) {
   let mode = "none";
@@ -334,7 +424,7 @@ function showTranscript(speaker, text, status) {
   transcriptText.textContent = text;
   transcriptText.hidden = Boolean(
     currentCallTranscript.length
-    && (speaker === "MIURA" || speaker === "MEI LING")
+    && (speaker === currentUserLabel() || speaker === "MEI LING")
     && status !== "LISTENING"
     && status !== "HEARING"
     && !liveTranscriptStatuses.has(status),
@@ -458,9 +548,15 @@ function stopRing() {
   codec.classList.remove("is-ringing");
 }
 
+function cancelEditorialFallbackSchedule() {
+  editorialFallbackSchedule?.cancel?.();
+  editorialFallbackSchedule = null;
+}
+
 function clearCallTimers() {
   window.clearTimeout(callTimer);
   window.clearTimeout(recognitionRestartTimer);
+  cancelEditorialFallbackSchedule();
   callTimer = null;
   recognitionRestartTimer = null;
 }
@@ -493,6 +589,8 @@ async function fetchWithTimeout(resource, options = {}, timeout = 45_000) {
 }
 
 function cancelActiveRequests() {
+  currentTurnAbortController?.abort("Turn cancelled");
+  currentTurnAbortController = null;
   activeRequests.forEach((controller) => controller.abort());
   activeRequests.clear();
 }
@@ -578,7 +676,7 @@ function renderCallHistory() {
     turn.className = `codec-call-history__turn codec-call-history__turn--${role}`;
     const speaker = document.createElement("span");
     speaker.className = "codec-call-history__speaker";
-    speaker.textContent = role === "assistant" ? "MEI LING" : "MIURA";
+    speaker.textContent = role === "assistant" ? "MEI LING" : currentUserLabel();
     const body = document.createElement("div");
     body.className = "codec-call-history__body";
     const text = document.createElement("p");
@@ -616,8 +714,10 @@ function rememberCallTurn(role, content, { searchResults = [], searchEntryPointH
 
 function resetCallTranscript() {
   window.clearTimeout(liveDebriefTimer);
+  cancelEditorialFallbackSchedule();
   liveDebriefSequence += 1;
   currentCallTranscript = [];
+  editorialFlowState = createEditorialFlowState();
   renderCallHistory();
 }
 
@@ -630,8 +730,8 @@ function scheduleLiveDebrief() {
     try {
       let item;
       if (appConfig.clientAI) {
-        const { createDebrief } = await import("./firebase-ai-client.js?v=23");
-        item = await createDebrief(transcript);
+        const { createDebrief } = await import("./firebase-ai-client.js?v=38");
+        item = await createDebrief(transcript, clientAiUserContext());
       } else {
         const response = await fetchWithTimeout("/api/debrief/preview", {
           method: "POST",
@@ -675,9 +775,19 @@ function addPanelEmpty(container, message) {
   container.append(empty);
 }
 
-function addPanelBlock(container, { label, title, text, items, keyValues } = {}) {
+function addPanelBlock(container, {
+  label,
+  title,
+  hint,
+  text,
+  items,
+  keyValues,
+  explanations,
+  className,
+} = {}) {
   const block = document.createElement("section");
   block.className = "codec-data-block";
+  if (className) block.classList.add(...String(className).split(/\s+/u).filter(Boolean));
 
   if (label) {
     const eyebrow = document.createElement("p");
@@ -691,11 +801,32 @@ function addPanelBlock(container, { label, title, text, items, keyValues } = {})
     heading.textContent = title;
     block.append(heading);
   }
+  if (hint) {
+    const helper = document.createElement("p");
+    helper.className = "codec-data-block__hint";
+    helper.textContent = hint;
+    block.append(helper);
+  }
   if (text) {
     const paragraph = document.createElement("p");
     paragraph.className = "codec-data-block__text";
     paragraph.textContent = text;
     block.append(paragraph);
+  }
+  if (Array.isArray(explanations) && explanations.length) {
+    const group = document.createElement("div");
+    group.className = "codec-data-explanations";
+    explanations.forEach(({ label: detailLabel, text: detailText }) => {
+      if (!detailText) return;
+      const item = document.createElement("div");
+      const heading = document.createElement("h4");
+      const paragraph = document.createElement("p");
+      heading.textContent = String(detailLabel || "Dettaglio");
+      paragraph.textContent = String(detailText);
+      item.append(heading, paragraph);
+      group.append(item);
+    });
+    if (group.childElementCount) block.append(group);
   }
   if (Array.isArray(items) && items.length) {
     const list = document.createElement("ul");
@@ -725,20 +856,49 @@ function addPanelBlock(container, { label, title, text, items, keyValues } = {})
   return block;
 }
 
+const panelPurposeCopy = Object.freeze({
+  intel: {
+    label: "INTEL // COME USARLO",
+    title: "Costruisci la settimana Instagram",
+    text: "Dopo il tuo «vai», Mei Ling ordina una News, un Trend verificato e tre slot Golden Bananas scelti da te. Controlla sempre fonti e rating prima di registrare.",
+  },
+  debrief: {
+    label: "DEBRIEF // COME USARLO",
+    title: "Trasforma la chiamata in un piano",
+    text: "Qui ritrovi ciò che avete deciso, le idee da sviluppare, le azioni concrete e i punti da riprendere nella prossima conversazione.",
+  },
+});
+
+function addPanelPurpose(container, name) {
+  return addPanelBlock(container, {
+    ...panelPurposeCopy[name],
+    className: "codec-panel-purpose",
+  });
+}
+
 const intelPanelLabels = Object.freeze({
   contentType: { news: "NOTIZIA", evergreen: "IDEA EVERGREEN" },
   sourceTier: {
     "official-primary": "UFFICIALE / PRIMARIA",
+    "established-secondary": "TESTATA SPECIALISTICA",
+    "trusted-secondary": "TESTATA SPECIALISTICA",
     aggregator: "AGGREGATORE",
     evergreen: "PROFILO EDITORIALE",
     unknown: "NON VERIFICATA",
   },
   claimStatus: {
     confirmed: "CONFERMATA",
+    verified: "VERIFICATA",
     reported: "SEGNALATA, DA VERIFICARE",
+    "needs-verification": "DA VERIFICARE",
+    "not-news": "IDEA, NON NOTIZIA",
     evergreen: "IDEA, NON NOTIZIA",
   },
-  recommendation: { cover: "COPRI", monitor: "MONITORA", skip: "SCARTA" },
+  recommendation: {
+    cover: "COPRI ORA",
+    monitor: "TIENI D’OCCHIO",
+    skip: "NON PRIORITARIA",
+  },
 });
 
 function intelPanelLabel(group, value, fallback = "—") {
@@ -755,24 +915,32 @@ function intelPanelScore(value) {
 function addIntelEvaluation(container, intel) {
   const evergreen = String(intel.contentType || "news").toLowerCase() === "evergreen";
   const recommendation = String(intel.recommendation || "monitor").toLowerCase();
-  const text = [
-    intel.sourceAssessment,
-    intel.whyItMatters ? "PERCHÉ CONTA // " + intel.whyItMatters : "",
-  ].filter(Boolean).join("\n\n");
   const block = addPanelBlock(container, {
-    label: "VALUTAZIONE // " + intelPanelLabel("contentType", intel.contentType, "NOTIZIA"),
+    label: "VERDETTO EDITORIALE // " + intelPanelLabel("contentType", intel.contentType, "NOTIZIA"),
     title: evergreen
-      ? "IDEA EDITORIALE — NON È UNA NOTIZIA"
-      : intelPanelLabel("recommendation", recommendation, "MONITORA"),
-    text,
+      ? "IDEA DA SVILUPPARE — NON È UNA NOTIZIA"
+      : intelPanelLabel("recommendation", recommendation, "TIENI D’OCCHIO"),
+    hint: evergreen
+      ? "Usala come spunto creativo: non presentarla come fatto nuovo."
+      : "La prima riga dice cosa fare. I punteggi 0–100 spiegano perché.",
+    explanations: [
+      {
+        label: evergreen ? "BASE DELLO SPUNTO" : "AFFIDABILITÀ DELLA FONTE",
+        text: intel.sourceAssessment,
+      },
+      {
+        label: "PERCHÉ PUÒ INTERESSARE IL TUO PUBBLICO",
+        text: intel.whyItMatters,
+      },
+    ],
     keyValues: [
-      ["RACCOMANDAZIONE", intelPanelLabel("recommendation", recommendation, "MONITORA")],
-      [evergreen ? "BASE" : "FONTE", intelPanelLabel("sourceTier", intel.sourceTier, "NON VERIFICATA")],
-      [evergreen ? "STATO" : "CLAIM", intelPanelLabel("claimStatus", intel.claimStatus, "DA VERIFICARE")],
-      [evergreen ? "SOLIDITÀ" : "CONFIDENZA", intelPanelScore(intel.confidenceScore)],
-      ["FIT CANALE", intelPanelScore(intel.channelFitScore)],
-      ["ATTUALITÀ", intelPanelScore(intel.timelinessScore)],
-      ["OPPORTUNITÀ", intelPanelScore(intel.opportunityScore)],
+      ["AZIONE CONSIGLIATA", intelPanelLabel("recommendation", recommendation, "TIENI D’OCCHIO")],
+      [evergreen ? "BASE" : "TIPO DI FONTE", intelPanelLabel("sourceTier", intel.sourceTier, "NON VERIFICATA")],
+      [evergreen ? "STATO" : "VERIFICA", intelPanelLabel("claimStatus", intel.claimStatus, "DA VERIFICARE")],
+      [evergreen ? "SOLIDITÀ" : "AFFIDABILITÀ", intelPanelScore(intel.confidenceScore)],
+      ["AFFINITÀ COL CANALE", intelPanelScore(intel.channelFitScore)],
+      ["URGENZA", intelPanelScore(intel.timelinessScore)],
+      ["POTENZIALE", intelPanelScore(intel.opportunityScore)],
     ],
   });
   block.classList.add("codec-intel-evaluation");
@@ -780,94 +948,329 @@ function addIntelEvaluation(container, intel) {
   block.dataset.recommendation = recommendation;
 }
 
-function renderIntelPanel() {
-  clearPanelContent(intelContent);
-  const intel = panelData.briefings.find((item) => item?.kind === "daily-intel");
-  if (!intel) {
-    addPanelEmpty(intelContent, "Nessun Daily Intel disponibile. Mei Ling mostrerà qui fonti, angolo editoriale e missione di registrazione.");
+function addIntelSources(container, evidence) {
+  const entries = Array.isArray(evidence) ? evidence.filter(Boolean) : [];
+  if (!entries.length) return;
+
+  const block = addPanelBlock(container, {
+    label: `FONTI E LINK // ${entries.length}`,
+    title: "Controlla i fatti prima di pubblicare",
+    hint: "Apri la fonte originale per verificare titolo, data e contesto.",
+    className: "codec-intel-sources",
+  });
+  const list = document.createElement("ol");
+  list.className = "codec-source-list";
+
+  entries.forEach((entry) => {
+    const item = document.createElement("li");
+    if (typeof entry === "string") {
+      item.textContent = entry;
+      list.append(item);
+      return;
+    }
+
+    const source = document.createElement("span");
+    source.className = "codec-source-list__source";
+    source.textContent = String(entry?.source || "Fonte");
+    const title = document.createElement("span");
+    title.className = "codec-source-list__title";
+    title.textContent = String(entry?.title || "Approfondimento");
+    item.append(source, title);
+
+    const url = safeNewsUrl(entry?.url || entry?.canonicalUrl);
+    if (url) {
+      const link = document.createElement("a");
+      link.className = "codec-source-list__link";
+      link.href = url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = "APRI FONTE ↗";
+      link.setAttribute("aria-label", `Apri fonte: ${title.textContent}`);
+      item.append(link);
+    }
+    list.append(item);
+  });
+
+  block.append(list);
+}
+
+const editorialDayLabels = Object.freeze({
+  monday: "LUNEDÌ",
+  tuesday: "MARTEDÌ",
+  wednesday: "MERCOLEDÌ",
+  thursday: "GIOVEDÌ",
+  friday: "VENERDÌ",
+  saturday: "SABATO",
+  sunday: "DOMENICA",
+});
+
+function editorialDayLabel(value) {
+  return editorialDayLabels[String(value || "").toLowerCase()] || "GIORNO DA DEFINIRE";
+}
+
+function addEditorialSignal(container, item, label) {
+  if (!item) return null;
+  return addPanelBlock(container, {
+    label: `${label} // ${editorialDayLabel(item.suggestedDay)}`,
+    title: item.title || `${label} da verificare`,
+    text: item.summary || item.whyNow || "Segnale editoriale pronto.",
+    explanations: [
+      { label: "PERCHÉ ADESSO", text: item.whyNow },
+      { label: `ANGOLO DI ${currentUserLabel()}`, text: item.angle },
+      { label: "GANCIO", text: item.hook },
+      { label: "CALL TO ACTION", text: item.cta },
+    ],
+    keyValues: [
+      ["FORMATO", String(item.format || "—").toLocaleUpperCase("it-IT")],
+      ["AFFIDABILITÀ", intelPanelScore(item.confidenceScore)],
+      ...(item.sourceCount ? [["FONTI DISTINTE", item.sourceCount]] : []),
+    ],
+    className: label === "NEWS" ? "codec-data-block--hero" : "codec-data-block--action",
+  });
+}
+
+function editorialRevealKey(plan) {
+  return String(plan?.id || plan?.weekOf || "").trim();
+}
+
+function markEditorialReveal(element, step, variant = "signal") {
+  if (!element) return element;
+  element.classList.add("codec-editorial-reveal");
+  element.dataset.editorialReveal = variant;
+  element.style.setProperty("--editorial-reveal-delay", `${180 + (step * 260)}ms`);
+  return element;
+}
+
+function playPendingEditorialReveal() {
+  const planKey = editorialRevealKey(latestEditorialPlan);
+  if (!panelOpen || activePanelTab !== "intel" || !planKey || planKey !== pendingEditorialRevealKey) return;
+
+  window.cancelAnimationFrame(editorialRevealFrame);
+  if (reduceMotion.matches) {
+    intelContent.classList.remove("codec-editorial-sequence--armed", "codec-editorial-sequence--active");
+    pendingEditorialRevealKey = "";
     return;
   }
 
+  editorialRevealFrame = window.requestAnimationFrame(() => {
+    if (!panelOpen || activePanelTab !== "intel" || editorialRevealKey(latestEditorialPlan) !== pendingEditorialRevealKey) return;
+    intelContent.classList.remove("codec-editorial-sequence--armed");
+    intelContent.classList.add("codec-editorial-sequence--active");
+    pendingEditorialRevealKey = "";
+  });
+}
+
+const safeRuntimeDiagnosticCodes = new Set([
+  "OK",
+  "APP_CHECK_UNAVAILABLE",
+  "REQUEST_TIMEOUT",
+  "NETWORK_UNAVAILABLE",
+  "MODEL_UNAVAILABLE",
+  "RUNTIME_UNAVAILABLE",
+  "SNAPSHOT_UNAVAILABLE",
+  "SNAPSHOT_STALE",
+  "EVIDENCE_INCOMPLETE",
+  "PLAYBACK_UNAVAILABLE",
+]);
+
+function safeRuntimeDiagnosticCode(value, fallback = "RUNTIME_UNAVAILABLE") {
+  const candidate = String(value?.diagnostic?.code || value?.code || value || "").toUpperCase();
+  return safeRuntimeDiagnosticCodes.has(candidate) ? candidate : fallback;
+}
+
+function renderWeeklyEditorialPlan(container, plan, { animate = false } = {}) {
+  const researchReady = Array.isArray(plan.news) && plan.news.length
+    && Array.isArray(plan.trends) && plan.trends.length;
+  const researchDiagnostic = safeRuntimeDiagnosticCode(
+    plan?.research?.diagnostic?.code,
+    researchReady ? "OK" : "EVIDENCE_INCOMPLETE",
+  );
+  document.body.dataset.researchDiagnostic = researchDiagnostic;
+  addPanelBlock(container, {
+    label: `PIANO INSTAGRAM // SETTIMANA ${String(plan.weekOf || "").toLocaleUpperCase("it-IT")}`,
+    title: researchReady ? "NEWS + TREND + 3 GOLDEN BANANAS" : "PIANO IN ATTESA DI PROVE COMPLETE",
+    text: researchReady
+      ? `Mei Ling ha organizzato la ricerca settimanale. Le fonti sono sotto; i giochi dei Golden Bananas restano una scelta esclusiva di ${currentUserName()}.`
+      : "La struttura è pronta, ma Mei Ling non riempie News o Trend con informazioni non sufficientemente verificate.",
+    hint: researchReady ? "DIAGNOSTIC // OK" : `DIAGNOSTIC // ${researchDiagnostic}`,
+    className: "codec-data-block--hero",
+  });
+
+  const newsBlock = plan.news?.[0]
+    ? addEditorialSignal(container, plan.news[0], "NEWS")
+    : addPanelBlock(container, {
+    label: "NEWS // RICERCA INCOMPLETA",
+    title: "Nessuna notizia abbastanza solida",
+    text: "Rigenera lo snapshot RSS prima del deploy o usa SYNC per ritentare il caricamento.",
+  });
+  if (animate) markEditorialReveal(newsBlock, 0, "news");
+
+  const trendBlock = plan.trends?.[0]
+    ? addEditorialSignal(container, plan.trends[0], "TREND")
+    : addPanelBlock(container, {
+    label: "TREND // RICERCA INCOMPLETA",
+    title: "Nessun segnale multi-fonte abbastanza solido",
+    text: "Mei Ling non confonde una singola notizia con un trend e non inventa metriche social.",
+  });
+  if (animate) markEditorialReveal(trendBlock, 1, "trend");
+
+  const bananaSlots = Array.isArray(plan.goldenBananas) ? plan.goldenBananas.slice(0, 3) : [];
+  const bananaBlock = addPanelBlock(container, {
+    label: `3 GOLDEN BANANAS // SCELTA DI ${currentUserLabel()}`,
+    title: "Tre indie poco conosciuti da consigliare",
+    hint: "Mei Ling prepara il formato soltanto dopo che scegli personalmente i tre giochi.",
+    items: Array.from({ length: 3 }, (_, index) => {
+      const slot = bananaSlots[index] || { slot: index + 1, game: null };
+      const game = slot.game || "IN ATTESA DELLA TUA SCELTA";
+      return `${slot.slot || index + 1}. ${game} — ${editorialDayLabel(slot.suggestedDay)}`;
+    }),
+    className: "codec-data-block--action",
+  });
+  bananaBlock.classList.add("codec-editorial-banana-group");
+  if (animate) {
+    markEditorialReveal(bananaBlock, 2, "golden-bananas");
+    bananaBlock.querySelectorAll(".codec-data-list li").forEach((slot, index) => {
+      slot.classList.add("codec-editorial-slot-reveal");
+      slot.dataset.editorialReveal = `golden-banana-${index + 1}`;
+      slot.style.setProperty("--editorial-reveal-delay", `${700 + (index * 260)}ms`);
+    });
+    container.classList.add("codec-editorial-sequence--armed");
+  }
+  addIntelSources(container, plan.evidence);
+}
+
+function renderIntelPanel() {
+  intelContent.classList.remove("codec-editorial-sequence--armed", "codec-editorial-sequence--active");
+  clearPanelContent(intelContent);
+  addPanelPurpose(intelContent, "intel");
+  const weeklyPlan = latestEditorialPlan
+    || panelData.briefings.find((item) => item?.kind === "weekly-editorial-plan");
+  const intel = panelData.briefings.find((item) => item?.kind === "daily-intel");
+  const animateWeeklyPlan = editorialRevealKey(weeklyPlan) === pendingEditorialRevealKey;
+  if (weeklyPlan) renderWeeklyEditorialPlan(intelContent, weeklyPlan, { animate: animateWeeklyPlan });
+  if (!intel && !weeklyPlan) {
+    addPanelEmpty(intelContent, "Nessun briefing disponibile. Premi SYNC: Mei Ling cercherà una notizia gaming utile oppure proporrà un’idea evergreen chiaramente indicata.");
+    return;
+  }
+  if (!intel) return;
+
+  if (weeklyPlan) {
+    addPanelBlock(intelContent, {
+      label: "RADAR GIORNALIERO",
+      title: "Intel da tenere separata dal piano settimanale",
+      hint: "Questo elemento può cambiare durante la settimana e non sostituisce il calendario approvato.",
+      className: "codec-data-block--secondary",
+    });
+  }
+
   addPanelBlock(intelContent, {
-    label: `DAILY INTEL // ${formatPanelDate(intel.createdAt)}`,
+    label: `BRIEFING DEL GIORNO // ${formatPanelDate(intel.createdAt)}`,
     title: intel.title || "Briefing di Mei Ling",
     text: intel.spokenSummary || "Briefing pronto.",
+    className: "codec-data-block--hero",
   });
   addIntelEvaluation(intelContent, intel);
   if (intel.creatorAngle) {
     addPanelBlock(intelContent, {
-      label: "CREATOR ANGLE",
+      label: "COME RACCONTARLA",
+      title: `L’angolo per ${currentUserName()}`,
+      hint: "La prospettiva che rende il tema riconoscibile e personale.",
       text: intel.creatorAngle,
     });
   }
   if (intel.recordingMission) {
     addPanelBlock(intelContent, {
-      label: "RECORDING MISSION",
+      label: "PROSSIMA MOSSA",
+      title: "Cosa registrare ora",
+      hint: "Una consegna concreta per trasformare l’idea in contenuto.",
       text: intel.recordingMission,
+      className: "codec-data-block--action",
     });
   }
-
-  const evidence = Array.isArray(intel.evidence)
-    ? intel.evidence.map((item) => {
-      if (typeof item === "string") return item;
-      const title = String(item?.title || "Fonte verificata");
-      const source = String(item?.source || "Fonte");
-      const url = String(item?.url || item?.canonicalUrl || "").trim();
-      return [source + " — " + title, url].filter(Boolean).join("\n");
-    }).filter(Boolean)
-    : [];
-  if (evidence.length) {
-    addPanelBlock(intelContent, {
-      label: "EVIDENCE",
-      items: evidence,
-    });
-  }
+  addIntelSources(intelContent, intel.evidence);
 }
 
 function renderDebriefPanel() {
   clearPanelContent(debriefContent);
+  addPanelPurpose(debriefContent, "debrief");
   const stored = panelData.briefings.find((item) => item?.kind === "call-debrief");
   const item = latestDebrief || stored;
   if (!item) {
     addPanelEmpty(
       debriefContent,
-      latestDebriefError || "Chiudi una conversazione con Mei Ling: qui troverai decisioni, idee, task e prossimi passi.",
+      latestDebriefError || "Nessuna chiamata da riassumere. Dopo una conversazione, qui troverai decisioni, idee e azioni già ordinate.",
     );
     return;
   }
 
   addPanelBlock(debriefContent, {
-    label: `CALL DEBRIEF // ${formatPanelDate(item.createdAt)}`,
+    label: `RIEPILOGO DELLA CHIAMATA // ${formatPanelDate(item.createdAt)}`,
     title: item.title || "Debrief Codec",
     text: item.summary || item.spokenSummary || (item.persistent === false ? "Debrief temporaneo pronto." : "Debrief salvato."),
+    className: "codec-data-block--hero",
+  });
+
+  addPanelBlock(debriefContent, {
+    label: "QUADRO RAPIDO",
+    title: "Cosa è emerso",
+    hint: "Usa questi numeri per trovare subito la sezione che ti serve.",
+    keyValues: [
+      ["DECISIONI", Array.isArray(item.decisions) ? item.decisions.length : 0],
+      ["IDEE", Array.isArray(item.ideas) ? item.ideas.length : 0],
+      ["AZIONI", Array.isArray(item.tasks) ? item.tasks.length : 0],
+      ["DA RIPRENDERE", Array.isArray(item.followUps) ? item.followUps.length : 0],
+    ],
+    className: "codec-debrief-overview",
   });
   if (Array.isArray(item.decisions) && item.decisions.length) {
-    addPanelBlock(debriefContent, { label: "DECISIONI", items: item.decisions });
+    addPanelBlock(debriefContent, {
+      label: "DECISIONI PRESE",
+      title: "Cosa abbiamo stabilito",
+      hint: "Scelte già definite: non serve ridiscuterle, salvo nuove informazioni.",
+      items: item.decisions,
+    });
   }
   if (Array.isArray(item.ideas) && item.ideas.length) {
-    addPanelBlock(debriefContent, { label: "IDEE", items: item.ideas });
+    addPanelBlock(debriefContent, {
+      label: "IDEE DA SVILUPPARE",
+      title: "Spunti emersi",
+      hint: "Possibilità interessanti che non sono ancora impegni.",
+      items: item.ideas,
+    });
   }
   if (Array.isArray(item.tasks) && item.tasks.length) {
     addPanelBlock(debriefContent, {
-      label: "TASK",
+      label: "AZIONI",
+      title: "Cosa fare adesso",
+      hint: "Passi concreti da completare dopo la chiamata.",
       items: item.tasks.map((task) => {
         if (typeof task === "string") return task;
-        const owner = task?.owner ? ` · ${task.owner}` : "";
-        const status = task?.status ? ` · ${task.status}` : "";
-        return `${task?.text || "Task"}${owner}${status}`;
+        const details = [
+          task?.owner ? `Responsabile: ${task.owner}` : "",
+          task?.status ? `Stato: ${task.status}` : "",
+        ].filter(Boolean);
+        return [task?.text || "Azione", details.join(" · ")].filter(Boolean).join(" — ");
       }),
+      className: "codec-data-block--action",
     });
   }
   if (Array.isArray(item.followUps) && item.followUps.length) {
-    addPanelBlock(debriefContent, { label: "FOLLOW-UP", items: item.followUps });
+    addPanelBlock(debriefContent, {
+      label: "DA RIPRENDERE",
+      title: "Domande e verifiche aperte",
+      hint: "Punti da controllare o riportare nella prossima conversazione.",
+      items: item.followUps,
+    });
   }
   addPanelBlock(debriefContent, {
-    label: "TRACE",
+    label: "DETTAGLI TECNICI",
+    hint: "Informazioni sul modo in cui questo riepilogo è stato estratto.",
     keyValues: [
-      ["Estrazione", item.extractionMode || "locale"],
-      ["Turni", item.transcript?.turnCount ?? "—"],
-      [item.persistent === false ? "Sessione" : "Salvato", formatPanelDate(item.createdAt)],
+      ["METODO", item.extractionMode || "locale"],
+      ["TURNI ANALIZZATI", item.transcript?.turnCount ?? "—"],
+      [item.persistent === false ? "SESSIONE" : "SALVATO", formatPanelDate(item.createdAt)],
     ],
+    className: "codec-data-block--secondary",
   });
 }
 
@@ -935,9 +1338,14 @@ async function refreshPanelData({ announce = false } = {}) {
   if (appConfig.clientAI) {
     if (announce) panelStatus.textContent = "Sincronizzazione Intel in corso.";
     try {
-      const { loadDailyIntel } = await import("./firebase-ai-client.js?v=23");
-      const intel = await loadDailyIntel();
-      panelData = { briefings: [intel], instructions: [], status: null, sources: [] };
+      const { loadDailyIntel } = await import("./firebase-ai-client.js?v=38");
+      const intel = await loadDailyIntel(clientAiUserContext());
+      panelData = {
+        briefings: [latestEditorialPlan, intel].filter(Boolean),
+        instructions: [],
+        status: null,
+        sources: [],
+      };
       renderPanels();
       if (announce) panelStatus.textContent = "Pannelli di Mei Ling aggiornati.";
     } catch (error) {
@@ -983,12 +1391,12 @@ async function refreshPanelData({ announce = false } = {}) {
 async function refreshIntelNow() {
   if (appConfig.clientAI) {
     panelStatus.textContent = "Scansione gaming globale in corso.";
-    const { loadDailyIntel } = await import("./firebase-ai-client.js?v=23");
-    const intel = await loadDailyIntel({ force: true });
-    panelData.briefings = [intel];
+    const { loadDailyIntel } = await import("./firebase-ai-client.js?v=38");
+    const intel = await loadDailyIntel({ ...clientAiUserContext(), force: true });
+    panelData.briefings = [latestEditorialPlan, intel].filter(Boolean);
     renderPanels();
     panelStatus.textContent = intel.contentType === "news"
-      ? "Intel gaming aggiornata con fonti live."
+      ? "Intel gaming aggiornata dallo snapshot RSS."
       : "Nessuna news solida: missione evergreen pronta.";
     return;
   }
@@ -1034,13 +1442,14 @@ function openPanel(name = activePanelTab, { focus = true } = {}) {
   panel.inert = false;
   panelBackdrop.setAttribute("aria-hidden", "false");
   panelStatus.textContent = `${name.toLocaleUpperCase("it")} aperto.`;
+  if (name === "intel") playPendingEditorialReveal();
   if (focus) {
     window.setTimeout(() => {
       const activeTab = panelTabs.find((tab) => tab.dataset.panelTab === name);
       activeTab?.focus({ preventScroll: true });
     }, reduceMotion.matches ? 0 : 310);
   }
-  void refreshPanelData();
+  if (!(name === "intel" && pendingEditorialRevealKey)) void refreshPanelData();
 }
 
 function closePanel({ restoreFocus = true } = {}) {
@@ -1116,7 +1525,7 @@ function bindPanelSwipe(surface, { edge = false } = {}) {
 function registerCodecServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
   serviceWorkerRegistrationPromise = navigator.serviceWorker
-    .register(assetUrl("service-worker.js"))
+    .register(assetUrl("service-worker.js?v=38"), { updateViaCache: "none" })
     .catch(() => null);
 }
 
@@ -1148,7 +1557,7 @@ async function showBriefingNotification(briefingId) {
       (await serviceWorkerRegistrationPromise) ||
       (await navigator.serviceWorker.ready);
     await registration.showNotification("Mei Ling — Codec", {
-      body: "Miura, ho un nuovo briefing per te.",
+      body: `${currentUserName()}, ho un nuovo briefing per te.`,
       tag: "mei-ling-briefing",
       renotify: true,
       data: {
@@ -1375,12 +1784,49 @@ function releaseMicrophone() {
 async function transcribeAudio(blob) {
   if (!connected || busy || !blob.size) return;
   const epoch = callEpoch;
+  const turnAbortController = new AbortController();
+  currentTurnAbortController?.abort("Turn superseded");
+  currentTurnAbortController = turnAbortController;
   busy = true;
   setComposerBusy(true);
   setState("thinking", "TRANSCRIBING");
-  showTranscript("MIURA", "TRASCRIZIONE…", "TRANSCRIBING");
+  showTranscript(currentUserLabel(), "TRASCRIZIONE…", "TRANSCRIBING");
 
   try {
+    if (appConfig.clientAI) {
+      const { askMeiFromAudio } = await import("./firebase-ai-client.js?v=38");
+      const payload = await askMeiFromAudio({
+        audioBlob: blob,
+        history: currentCallTranscript.map(({ role, content }) => ({ role, content })),
+        signal: turnAbortController.signal,
+        ...clientAiUserContext(),
+      });
+      if (!connected || epoch !== callEpoch) return;
+      const message = String(payload.transcript || "").trim();
+      if (!message || isKnownPhantomInput(message) || isLowInformationVoiceInput(message)) {
+        busy = false;
+        setComposerBusy(false);
+        scheduleLocalRetry("NON HO RICEVUTO PAROLE — RIPROVO", 450);
+        return;
+      }
+      localSttFailed = false;
+      setConversationLanguage(payload.language || detectLanguage(message));
+      rememberCallTurn("user", message);
+      window.applyMeiReply(payload);
+      rememberCallTurn("assistant", payload.reply, {
+        searchResults: payload.searchResults,
+        searchEntryPointHtml: payload.searchEntryPointHtml,
+      });
+      showTranscript("MEI LING", payload.reply, "TRANSMITTING");
+      busy = false;
+      setComposerBusy(false);
+      await speakFast(compactSpokenReply(payload.spokenReply, payload.reply, {
+        maxSentences: 1,
+        maxWords: 22,
+      }), payload.language);
+      scheduleLiveDebrief();
+      return;
+    }
     const response = await fetchWithTimeout("/api/transcribe", {
       method: "POST",
       headers: {
@@ -1408,6 +1854,8 @@ async function transcribeAudio(blob) {
     setComposerBusy(false);
     if (!connected || epoch !== callEpoch || error.name === "AbortError") return;
     scheduleLocalRetry("RIPRISTINO ASCOLTO LOCALE…", 700);
+  } finally {
+    if (currentTurnAbortController === turnAbortController) currentTurnAbortController = null;
   }
 }
 async function startLocalListening() {
@@ -1513,9 +1961,9 @@ async function startLocalListening() {
       }
     };
 
-    recorder.start(250);
+    recorder.start(160);
     setState("listening");
-    showTranscript("MIURA", "MICROFONO ATTIVO", "LOCAL MIC");
+    showTranscript(currentUserLabel(), "MICROFONO ATTIVO", "LOCAL MIC");
     let speechIndicatorShown = false;
     const samples = new Uint8Array(analyser.fftSize);
     vadTimer = window.setInterval(() => {
@@ -1531,7 +1979,7 @@ async function startLocalListening() {
       if (turn.speechDetected && !speechIndicatorShown) {
         speechIndicatorShown = true;
         silentMicCycles = 0;
-        showTranscript("MIURA", "VOCE RILEVATA", "RECORDING");
+        showTranscript(currentUserLabel(), "VOCE RILEVATA", "RECORDING");
       }
       if (turn.shouldStop) stopLocalListening({ discard: false });
     }, 80);
@@ -1567,6 +2015,8 @@ function stopRecognition() {
 
 function stopSpeech() {
   speechEpoch += 1;
+  currentSpeechAbortController?.abort("Speech stopped");
+  currentSpeechAbortController = null;
   const cancelCurrentSpeech = currentSpeechCancel;
   currentSpeechCancel = null;
   cancelCurrentSpeech?.();
@@ -1600,15 +2050,30 @@ function revealTextFallback(reason = "MICROFONO NON DISPONIBILE") {
   }
 }
 
+function revealSpeechTextOnly(reason = "VOCE NON DISPONIBILE — CONTINUO AD ASCOLTARTI") {
+  syncCallControls();
+  if (!connected) return;
+  setState("connected", "TEXT + MIC");
+  showTranscript("CODEC", reason, "TEXT + MIC");
+  scheduleConversationListening({ delay: 120, attempts: 12 });
+}
+
+function currentConversationLanguage() {
+  return normalizeSupportedLanguage(recognitionLanguage, browserLanguage);
+}
+
 function detectLanguage(text) {
-  const value = ` ${text.toLocaleLowerCase()} `;
-  const english = (value.match(/\b(the|and|you|your|this|that|with|what|how|let|we|is|are|game|content)\b/g) || []).length;
-  const italian = (value.match(/\b(il|lo|la|gli|le|e|che|con|per|come|cosa|sono|sei|tu|noi|gioco|contenuti)\b/g) || []).length;
-  return english > italian ? "en" : "it";
+  return resolveSupportedLanguage({
+    text,
+    current: currentConversationLanguage(),
+    browser: browserLanguage,
+  });
 }
 
 function setConversationLanguage(language) {
-  recognitionLanguage = language === "en" ? "en-US" : "it-IT";
+  recognitionLanguage = normalizeSupportedLanguage(language, currentConversationLanguage()) === "en"
+    ? "en-US"
+    : "it-IT";
   if (recognition && !recognitionActive) recognition.lang = recognitionLanguage;
 }
 
@@ -1652,22 +2117,38 @@ async function startListening() {
     }
     syncCallControls();
 
-    if (!appConfig.publicDemo && !localSttFailed && await startLocalListening()) return true;
+    const browserFirst = shouldPreferBrowserRecognition({
+      publicDemo: appConfig.publicDemo,
+      recognitionAvailable: Boolean(recognition),
+      recognitionBlocked,
+    });
+    if (browserFirst) {
+      recognition.lang = recognitionLanguage;
+      recognitionActive = true;
+      try {
+        recognition.start();
+        return true;
+      } catch {
+        recognitionActive = false;
+      }
+    }
+
+    if (!localSttFailed && await startLocalListening()) return true;
     if (localSttFailed || localMicError === "retryable") {
       if (!localRetryTimer) scheduleLocalRetry("ASCOLTO LOCALE IN RIPRISTINO…", 700);
       return false;
     }
-    if (localMicBlocked) {
+    if (localMicBlocked && (!recognition || recognitionBlocked)) {
       revealTextFallback("ACCESSO AL MICROFONO NEGATO — PUOI SCRIVERE");
       return false;
     }
-    if (localMicError === "unavailable") {
+    if (localMicError === "unavailable" && (!recognition || recognitionBlocked)) {
       revealTextFallback("MICROFONO NON DISPONIBILE — PUOI SCRIVERE");
       return false;
     }
     if (!canStartConnectedListening(epoch)) return false;
     if (!recognition || recognitionBlocked) {
-      revealTextFallback("SCRIVIMI QUI, MIURA");
+      revealTextFallback(`SCRIVIMI QUI, ${currentUserLabel()}`);
       return false;
     }
     if (recognitionActive) return true;
@@ -1699,33 +2180,82 @@ async function startListening() {
   }
 }
 
+function scheduleConversationListening({
+  delay = LISTEN_AFTER_SPEECH_MS,
+  attempts = LISTEN_RETRY_ATTEMPTS,
+} = {}) {
+  if (!connected) return;
+  const epoch = callEpoch;
+  let attemptsRemaining = attempts;
+  window.clearTimeout(recognitionRestartTimer);
+
+  const attempt = async () => {
+    recognitionRestartTimer = null;
+    if (!connected || epoch !== callEpoch || document.visibilityState !== "visible") return;
+    const started = await startListening();
+    const retry = shouldRetryConversationListening({
+      connected,
+      sameCall: epoch === callEpoch,
+      visible: document.visibilityState === "visible",
+      started,
+      attemptsRemaining,
+    });
+    if (!retry) return;
+    attemptsRemaining -= 1;
+    recognitionRestartTimer = window.setTimeout(() => void attempt(), LISTEN_RETRY_MS);
+  };
+
+  recognitionRestartTimer = window.setTimeout(() => void attempt(), delay);
+}
+
 function finishSpeechCycle() {
   if (!connected) return;
   setState("connected");
-  window.clearTimeout(recognitionRestartTimer);
-  recognitionRestartTimer = window.setTimeout(startListening, LISTEN_AFTER_SPEECH_MS);
+  scheduleConversationListening();
 }
 
-function speakFallback(text, language, epoch = callEpoch) {
+async function getBrowserVoices(timeoutMs = 900) {
+  const initial = window.speechSynthesis?.getVoices?.() || [];
+  if (initial.length) return initial;
+  await new Promise((resolve) => {
+    const timer = window.setTimeout(resolve, timeoutMs);
+    window.speechSynthesis?.addEventListener?.("voiceschanged", () => {
+      window.clearTimeout(timer);
+      resolve();
+    }, { once: true });
+  });
+  return window.speechSynthesis?.getVoices?.() || [];
+}
+
+async function speakFallback(text, language, epoch = callEpoch) {
   if (!connected || epoch !== callEpoch) return;
   if (!("speechSynthesis" in window)) {
-    revealTextFallback("VOCE NON DISPONIBILE — PUOI SCRIVERE");
-    return;
+    revealSpeechTextOnly();
+    return false;
   }
 
+  const fallbackCycle = speechEpoch;
   speechFallbackActive = true;
   const utterance = new SpeechSynthesisUtterance(text);
   currentSpeechUtterance = utterance;
   utterance.lang = language === "en" ? "en-US" : "it-IT";
   utterance.rate = 0.92;
   utterance.pitch = 1.04;
-  const voices = window.speechSynthesis.getVoices();
+  const voices = await getBrowserVoices();
+  if (!connected || epoch !== callEpoch || fallbackCycle !== speechEpoch) return false;
   const preferredVoiceNames = language === "en"
-    ? /aria|jenny|samantha|zira|serena|sonia|female|google uk english female/i
-    : /elsa|isabella|cosima|female|google italiano/i;
-  utterance.voice = voices.find((voice) => (
+    ? /aria|jenny|samantha|zira|serena|sonia|victoria|ava|allison|susan|moira|tessa|female|google uk english female/i
+    : /elsa|isabella|alice|federica|lucia|paola|cosima|female|google italiano/i;
+  const femaleVoice = voices.find((voice) => (
     voice.lang.toLowerCase().startsWith(language) && preferredVoiceNames.test(voice.name)
-  )) || voices.find((voice) => voice.lang.toLowerCase().startsWith(language)) || null;
+  ));
+  if (!femaleVoice) {
+    currentSpeechUtterance = null;
+    speechFallbackActive = false;
+    revealSpeechTextOnly("VOCE FEMMINILE NON DISPONIBILE — CONTINUO AD ASCOLTARTI");
+    return false;
+  }
+  utterance.voice = femaleVoice;
   utterance.onstart = () => {
     if (currentSpeechUtterance !== utterance) return;
     if (!connected || epoch !== callEpoch) {
@@ -1745,10 +2275,11 @@ function speakFallback(text, language, epoch = callEpoch) {
     currentSpeechUtterance = null;
     speechFallbackActive = false;
     if (connected && epoch === callEpoch) {
-      revealTextFallback("VOCE NON DISPONIBILE — PUOI SCRIVERE");
+      revealSpeechTextOnly();
     }
   };
   window.speechSynthesis.speak(utterance);
+  return true;
 }
 
 async function speak(text, language = detectLanguage(text)) {
@@ -1825,26 +2356,193 @@ async function speak(text, language = detectLanguage(text)) {
     fallbackOnce();
   }
 }
+async function requestWeeklyEditorialPlan({ command, triggerSource, signal }) {
+  const approvalMode = triggerSource === "timed-fallback"
+    ? "timed-fallback"
+    : "explicit-user-command";
+  if (appConfig.clientAI) {
+    const { loadWeeklyEditorialPlan } = await import("./firebase-ai-client.js?v=38");
+    return loadWeeklyEditorialPlan({
+      approved: true,
+      approvalMode,
+      signal,
+      ...clientAiUserContext(),
+    });
+  }
+  const response = await fetchWithTimeout("/api/editorial/weekly-plan", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sessionId,
+      approved: true,
+      approvalMode,
+      command,
+      armedAt: editorialFlowState.armedAt,
+    }),
+    signal,
+  }, 45_000);
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || "Piano editoriale non disponibile");
+  return payload;
+}
+
+async function presentMeiPayload(payload, epoch) {
+  if (!connected || epoch !== callEpoch) return false;
+
+  if (payload.editorialPlan) {
+    latestEditorialPlan = payload.editorialPlan;
+    pendingEditorialRevealKey = editorialRevealKey(latestEditorialPlan);
+    editorialFlowState = markEditorialPlanDelivered(editorialFlowState);
+    panelData.briefings = [
+      latestEditorialPlan,
+      ...panelData.briefings.filter((item) => item?.kind !== "weekly-editorial-plan"),
+    ];
+    renderPanels();
+  }
+
+  window.applyMeiReply(payload);
+  const language = payload.language || detectLanguage(payload.reply);
+  rememberCallTurn("assistant", payload.reply, {
+    searchResults: payload.searchResults,
+    searchEntryPointHtml: payload.searchEntryPointHtml,
+  });
+  const spokenReply = compactSpokenReply(payload.spokenReply, payload.reply, {
+    maxSentences: 1,
+    maxWords: 22,
+  });
+  setConversationLanguage(language);
+  showTranscript("MEI LING", payload.reply, "TRANSMITTING");
+  if (payload.editorialPlan && connected && epoch === callEpoch) openPanel("intel", { focus: false });
+  await speakFast(spokenReply, language);
+  scheduleLiveDebrief();
+  return true;
+}
+
+async function waitForEditorialTurnSlot(epoch, timeoutMs = 15_000) {
+  const startedAt = Date.now();
+  while (
+    connected
+    && epoch === callEpoch
+    && (busy || callIntroPending || Boolean(currentSpeechAudio) || speechFallbackActive)
+    && Date.now() - startedAt < timeoutMs
+  ) {
+    await new Promise((resolve) => window.setTimeout(resolve, 120));
+  }
+  return connected
+    && epoch === callEpoch
+    && !busy
+    && !callIntroPending
+    && !currentSpeechAudio
+    && !speechFallbackActive;
+}
+
+async function runTimedEditorialPlan({ command }) {
+  const epoch = callEpoch;
+  if (!await waitForEditorialTurnSlot(epoch)) {
+    if (connected && epoch === callEpoch) editorialFlowState = markEditorialPlanFailed(editorialFlowState);
+    return;
+  }
+
+  const turnAbortController = new AbortController();
+  currentTurnAbortController?.abort("Turn superseded");
+  currentTurnAbortController = turnAbortController;
+  busy = true;
+  setComposerBusy(true);
+  stopRecognition();
+  setState("thinking");
+  showTranscript("MEI LING", "PREPARO IL PIANO INSTAGRAM DELLA SETTIMANA…", "EDITORIAL AUTO");
+
+  try {
+    const payload = await requestWeeklyEditorialPlan({
+      command,
+      triggerSource: "timed-fallback",
+      signal: turnAbortController.signal,
+    });
+    await presentMeiPayload(payload, epoch);
+  } catch (error) {
+    if (!connected || epoch !== callEpoch || error.name === "AbortError") return;
+    editorialFlowState = markEditorialPlanFailed(editorialFlowState);
+    setState("error");
+    showTranscript("CODEC", error.message || "LA RICERCA EDITORIALE NON È DISPONIBILE", "LINK LOST");
+  } finally {
+    if (currentTurnAbortController === turnAbortController) currentTurnAbortController = null;
+    if (epoch === callEpoch) busy = false;
+    setComposerBusy(false);
+    syncCallControls();
+  }
+}
+
+function armAndScheduleEditorialFallback() {
+  cancelEditorialFallbackSchedule();
+  editorialFlowState = armEditorialFallbackWindow(editorialFlowState, { now: Date.now() });
+  editorialFallbackSchedule = scheduleTimedEditorialFallback({
+    getState: () => editorialFlowState,
+    setState: (nextState) => {
+      editorialFlowState = nextState;
+    },
+    onClaim: runTimedEditorialPlan,
+    onError: () => {
+      editorialFlowState = markEditorialPlanFailed(editorialFlowState);
+    },
+  });
+}
+
 async function sendMessage(message, { inputMode = "text" } = {}) {
   const clean = message.trim();
   if (!clean || busy || callIntroPending || !connected) return;
+  setConversationLanguage(detectLanguage(clean));
   const canonicalInputMode = inputModes.has(inputMode) ? inputMode : "text";
+  const editorialTurn = classifyEditorialTurn(editorialFlowState, clean);
+  editorialFlowState = editorialTurn.nextState;
+  if (editorialTurn.type === "already-triggered") {
+    if (latestEditorialPlan) openPanel("intel", { focus: false });
+    return;
+  }
+  if (editorialTurn.type === "consent") cancelEditorialFallbackSchedule();
   const epoch = callEpoch;
+  const turnAbortController = new AbortController();
+  currentTurnAbortController?.abort("Turn superseded");
+  currentTurnAbortController = turnAbortController;
   rememberCallTurn("user", clean);
 
   busy = true;
   setComposerBusy(true);
   stopRecognition();
   setState("thinking");
-  showTranscript("MIURA", clean, "PROCESSING");
+  showTranscript(currentUserLabel(), clean, "PROCESSING");
 
   try {
     let payload;
-    if (appConfig.clientAI) {
-      const { askMei } = await import("./firebase-ai-client.js?v=23");
+    if (editorialTurn.type === "greeting") {
+      if (appConfig.clientAI) {
+        void import("./firebase-ai-client.js?v=38")
+          .then(({ prewarmWeeklyEditorialResearch }) => prewarmWeeklyEditorialResearch(clientAiUserContext()))
+          .catch(() => {});
+      }
+      const language = currentConversationLanguage();
+      payload = {
+        reply: language === "en"
+          ? `Hello, ${currentUserName()}. I'm ready. Say “go” when you want this week's Instagram plan.`
+          : `Ciao, ${currentUserName()}. Sono pronta. Quando vuoi il piano Instagram della settimana, dimmi «vai».`,
+        spokenReply: language === "en"
+          ? `Hello, ${currentUserName()}. I'm ready; say “go” when you want the weekly plan.`
+          : `Ciao, ${currentUserName()}. Sono pronta; dimmi «vai» quando vuoi il piano settimanale.`,
+        expression: "neutral",
+        language,
+      };
+    } else if (editorialTurn.type === "consent") {
+      payload = await requestWeeklyEditorialPlan({
+        command: clean,
+        triggerSource: "explicit",
+        signal: turnAbortController.signal,
+      });
+    } else if (appConfig.clientAI) {
+      const { askMei } = await import("./firebase-ai-client.js?v=38");
       payload = await askMei({
         message: clean,
         history: currentCallTranscript.slice(0, -1).map(({ role, content }) => ({ role, content })),
+        signal: turnAbortController.signal,
+        ...clientAiUserContext(),
       });
     } else {
       const response = await fetchWithTimeout("/api/call", {
@@ -1864,24 +2562,18 @@ async function sendMessage(message, { inputMode = "text" } = {}) {
       if (!response.ok) throw new Error(payload.error || "Codec error");
     }
     if (!connected || epoch !== callEpoch) return;
-
-    window.applyMeiReply(payload);
-    const language = payload.language || detectLanguage(payload.reply);
-    rememberCallTurn("assistant", payload.reply, {
-      searchResults: payload.searchResults,
-      searchEntryPointHtml: payload.searchEntryPointHtml,
-    });
-    scheduleLiveDebrief();
-    const spokenReply = String(payload.spokenReply || payload.reply || "").trim();
-    setConversationLanguage(language);
-    showTranscript("MEI LING", payload.reply, "TRANSMITTING");
-    await speakFast(spokenReply, language);
+    await presentMeiPayload(payload, epoch);
+    if (editorialTurn.type === "greeting" && connected && epoch === callEpoch) {
+      armAndScheduleEditorialFallback();
+    }
   } catch (error) {
     if (!connected || epoch !== callEpoch || error.name === "AbortError") return;
+    if (editorialTurn.type === "consent") editorialFlowState = markEditorialPlanFailed(editorialFlowState);
     setState("error");
     showTranscript("CODEC", error.message || "LA LINEA CODEC È CADUTA", "LINK LOST");
     syncCallControls();
   } finally {
+    if (currentTurnAbortController === turnAbortController) currentTurnAbortController = null;
     if (epoch === callEpoch) busy = false;
     setComposerBusy(false);
     syncCallControls();
@@ -1910,7 +2602,7 @@ function setupRecognition() {
       return;
     }
     setState("listening");
-    showTranscript("MIURA", "MICROFONO BROWSER ATTIVO", "BROWSER MIC");
+    showTranscript(currentUserLabel(), "MICROFONO BROWSER ATTIVO", "BROWSER MIC");
   };
 
   recognition.onresult = (event) => {
@@ -1930,7 +2622,7 @@ function setupRecognition() {
 
     const cleanFinal = finalText.trim();
     if (cleanFinal && (isKnownPhantomInput(cleanFinal) || isLowInformationVoiceInput(cleanFinal))) {
-      showTranscript("MIURA", "RIPROVO AD ASCOLTARTI…", "BROWSER RETRY");
+      showTranscript(currentUserLabel(), "RIPROVO AD ASCOLTARTI…", "BROWSER RETRY");
       return;
     }
     if (cleanFinal && cleanFinal !== lastFinalTranscript) {
@@ -1944,11 +2636,17 @@ function setupRecognition() {
     recognitionActive = false;
     if (event.error === "aborted") return;
     if (event.error === "no-speech") {
-      showTranscript("MIURA", "NESSUNA VOCE RILEVATA — RIPROVO", "BROWSER RETRY");
+      showTranscript(currentUserLabel(), "NESSUNA VOCE RILEVATA — RIPROVO", "BROWSER RETRY");
       return;
     }
-    if (["not-allowed", "service-not-allowed", "audio-capture", "network"].includes(event.error)) {
+    if (event.error === "not-allowed") {
       revealTextFallback(`MICROFONO: ${event.error.toUpperCase()}`);
+      return;
+    }
+    if (["service-not-allowed", "audio-capture", "network"].includes(event.error)) {
+      recognitionBlocked = true;
+      showTranscript("CODEC", "PASSO ALL’ASCOLTO AUDIO LOCALE…", "MIC RETRY");
+      scheduleConversationListening({ delay: 220, attempts: 10 });
       return;
     }
     showTranscript("CODEC", `MICROFONO: ${event.error.toUpperCase()}`, "MIC ERROR");
@@ -1957,12 +2655,13 @@ function setupRecognition() {
   recognition.onend = () => {
     recognitionActive = false;
     if (!canStartConnectedListening() || recognitionBlocked) return;
-    recognitionRestartTimer = window.setTimeout(startListening, 650);
+    scheduleConversationListening({ delay: 180, attempts: 8 });
   };
 }
 
 async function connectCall({ incoming = false } = {}) {
   const epoch = callEpoch;
+  let offeredEditorialPlan = false;
   clearCallTimers();
   stopRing();
   calling = false;
@@ -2003,18 +2702,36 @@ async function connectCall({ incoming = false } = {}) {
       }
     }
 
-    const greeting = "Ci sono, Miura.";
+    offeredEditorialPlan = true;
+    if (appConfig.clientAI) {
+      void import("./firebase-ai-client.js?v=38")
+        .then(({ prewarmWeeklyEditorialResearch }) => prewarmWeeklyEditorialResearch(clientAiUserContext()))
+        .catch(() => {});
+    }
+    const language = currentConversationLanguage();
+    const greeting = language === "en"
+      ? `I'm here, ${currentUserName()}. Say “go”; otherwise I'll start in six seconds.`
+      : `Ci sono, ${currentUserName()}. Dimmi «vai»; altrimenti parto tra sei secondi.`;
+    rememberCallTurn("assistant", greeting);
     showTranscript("MEI LING", greeting, "LINK ACTIVE");
-    await speakFast(greeting, "it");
+    await speakFast(greeting, language);
   } finally {
     if (connected && epoch === callEpoch) {
       callIntroPending = false;
       setComposerBusy(false);
+      if (offeredEditorialPlan) armAndScheduleEditorialFallback();
+      if (!currentSpeechAudio && !speechFallbackActive) {
+        scheduleConversationListening({ delay: 120, attempts: 12 });
+      }
     }
   }
 }
 
 async function beginCall() {
+  if (appConfig.publicDemo && !publicIdentityReady) {
+    showPublicOnboarding("INSERISCI UN NOME PER APRIRE IL COLLEGAMENTO");
+    return;
+  }
   if (!runtimeReadiness.ready) {
     showRuntimeWarmupStatus();
     return;
@@ -2036,13 +2753,18 @@ async function beginCall() {
   showTranscript("CODEC", "CONNESSIONE ALLA FREQUENZA DI MEI LING…", "CALLING");
   playReveal({ replayAnimation: true });
 
-  const ownsAudio = appConfig.publicDemo || await ensureVoiceOwnership("begin-call");
+  const ownsAudio = await ensureVoiceOwnership("begin-call");
   if (!calling || connected || epoch !== callEpoch) return;
   if (!ownsAudio) {
     calling = false;
     setState("idle", "AUDIO IN ALTRA SCHEDA");
     showTranscript("CODEC", "AUDIO ATTIVO IN UN’ALTRA SCHEDA", "AUDIO PAUSED");
     return;
+  }
+  if (appConfig.clientAI) {
+    void import("./firebase-ai-client.js?v=38")
+      .then(({ prewarmMeiRuntime }) => prewarmMeiRuntime())
+      .catch(() => {});
   }
   if (!appConfig.publicDemo) void prepareMicrophone();
   startRing();
@@ -2051,8 +2773,8 @@ async function beginCall() {
 
 async function requestCallDebrief(transcriptSnapshot) {
   if (appConfig.clientAI) {
-    const { createDebrief } = await import("./firebase-ai-client.js?v=23");
-    return createDebrief(transcriptSnapshot);
+    const { createDebrief } = await import("./firebase-ai-client.js?v=38");
+    return createDebrief(transcriptSnapshot, clientAiUserContext());
   }
   const response = await fetchWithTimeout("/api/debrief", {
     method: "POST",
@@ -2197,6 +2919,10 @@ window.meiLingIncomingCall = triggerIncomingCall;
 
 function handleCodecAction() {
   requestNotificationPermissionFromGesture();
+  if (appConfig.publicDemo && !publicIdentityReady) {
+    showPublicOnboarding();
+    return;
+  }
   if (endingCall) return;
   if (!runtimeReadiness.ready) {
     showRuntimeWarmupStatus();
@@ -2222,6 +2948,20 @@ codec.addEventListener("keydown", (event) => {
   if (event.key !== "Enter" && event.key !== " ") return;
   event.preventDefault();
   handleCodecAction();
+});
+
+publicOnboardingForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const profile = createPublicUserProfile(publicUserNameInput?.value);
+  if (!profile) {
+    showPublicOnboarding("IL NOME NON PUÒ ESSERE VUOTO");
+    return;
+  }
+  applyPublicUserProfile(profile);
+  storePublicUserProfile(profile);
+  hidePublicOnboarding();
+  renderCallHistory();
+  void beginCall();
 });
 
 messageForm.addEventListener("submit", (event) => {
@@ -2349,10 +3089,8 @@ async function initializeCodec() {
   syncPortraitState(codec.dataset.state || "idle");
   renderRuntimeReadiness();
   void refreshRuntimeHealth();
-  void refreshPanelData();
+  if (!appConfig.publicDemo || publicIdentityReady) void refreshPanelData();
 
-  updateClock();
-  window.setInterval(updateClock, 15000);
   setupRecognition();
   playReveal();
   registerCodecServiceWorker();
@@ -2408,7 +3146,6 @@ function canRunWakeListener() {
 }
 
 async function ensureVoiceOwnership(reason = "voice") {
-  if (appConfig.publicDemo) return true;
   if (!voiceOwner) {
     return document.visibilityState === "visible" && document.hasFocus();
   }
@@ -2457,15 +3194,24 @@ async function activateCallFromWake() {
   setComposerBusy(true);
   playReveal({ replayAnimation: true });
 
-  const acknowledgement = "Ci sono, Miura.";
+  if (appConfig.clientAI) {
+    void import("./firebase-ai-client.js?v=38")
+      .then(({ prewarmWeeklyEditorialResearch }) => prewarmWeeklyEditorialResearch(clientAiUserContext()))
+      .catch(() => {});
+  }
+  const language = currentConversationLanguage();
+  const acknowledgement = language === "en"
+    ? `I'm here, ${currentUserName()}. Say “go”; otherwise I'll start in six seconds.`
+    : `Ci sono, ${currentUserName()}. Dimmi «vai»; altrimenti parto tra sei secondi.`;
   rememberCallTurn("assistant", acknowledgement);
   showTranscript("MEI LING", acknowledgement, "LINK ACTIVE");
   try {
-    await speakFast(acknowledgement, "it");
+    await speakFast(acknowledgement, language);
   } finally {
     if (connected && epoch === callEpoch) {
       callIntroPending = false;
       setComposerBusy(false);
+      armAndScheduleEditorialFallback();
     }
   }
 }
@@ -2790,14 +3536,108 @@ function settleSpeechRequest(promise) {
   );
 }
 
+function revealPublicSpeechTextOnly(reason, error = null) {
+  const diagnostic = safeRuntimeDiagnosticCode(error, "RUNTIME_UNAVAILABLE");
+  document.body.dataset.voiceEngine = "text-only";
+  document.body.dataset.voiceDiagnostic = diagnostic;
+  if (voiceEngineStatus) voiceEngineStatus.textContent = `VOICE ENGINE // TEXT ONLY // ${diagnostic}`;
+  revealSpeechTextOnly(reason);
+}
+
+async function requestPublicSpeechChunk(synthesize, text, language, epoch, cycle, signal) {
+  const blob = await synthesize({ text, language, signal });
+  if (!connected || epoch !== callEpoch || cycle !== speechEpoch || (voiceOwner && !voiceOwner.isOwner())) {
+    throw staleSpeechError();
+  }
+  const engine = String(blob?.meiVoiceEngine || "unknown");
+  document.body.dataset.voiceEngine = engine;
+  delete document.body.dataset.voiceDiagnostic;
+  if (voiceEngineStatus) {
+    voiceEngineStatus.textContent = engine === "gemini-3.8-flash-tts"
+      ? "VOICE ENGINE // GEMINI 3.8 FLASH TTS // ACHERNAR"
+      : "VOICE ENGINE // GEMINI TTS FALLBACK // ACHERNAR";
+  }
+  const source = URL.createObjectURL(blob);
+  return {
+    audio: new Audio(source),
+    source,
+    disposed: false,
+  };
+}
+
 async function speakFast(text, language = detectLanguage(text)) {
   if (appConfig.publicDemo) {
-    if (!connected) return false;
+    const chunks = splitSpeechIntoChunks(text, 22);
+    if (!connected || !chunks.length) return false;
+    const epoch = callEpoch;
     stopRecognition();
     stopSpeech();
+    const cycle = speechEpoch;
+    const speechAbortController = new AbortController();
+    currentSpeechAbortController = speechAbortController;
     setConversationLanguage(language);
-    speakFallback(text, language, callEpoch);
-    return true;
+    setState("speaking", "VOICE SYNC");
+    try {
+      const { synthesizeMeiSpeech } = await import("./firebase-ai-client.js?v=38");
+      let pending = settleSpeechRequest(
+        requestPublicSpeechChunk(
+          synthesizeMeiSpeech,
+          chunks[0],
+          language,
+          epoch,
+          cycle,
+          speechAbortController.signal,
+        ),
+      );
+      for (let index = 0; index < chunks.length; index += 1) {
+        const result = await pending;
+        if (result.error || !result.prepared) {
+          if (result.error?.name === "AbortError" || cycle !== speechEpoch) return false;
+          stopSpeech();
+          revealPublicSpeechTextOnly("VOCE NATURALE TEMPORANEAMENTE NON DISPONIBILE — RISPOSTA TESTUALE", result.error);
+          return false;
+        }
+
+        const next = index + 1 < chunks.length
+          ? settleSpeechRequest(
+              requestPublicSpeechChunk(
+                synthesizeMeiSpeech,
+                chunks[index + 1],
+                language,
+                epoch,
+                cycle,
+                speechAbortController.signal,
+              ),
+            )
+          : null;
+        try {
+          const played = await playPreparedSpeech(result.prepared, epoch, cycle);
+          if (!played) {
+            if (next) void next.then(({ prepared }) => disposePreparedSpeech(prepared));
+            return false;
+          }
+        } catch (error) {
+          if (next) void next.then(({ prepared }) => disposePreparedSpeech(prepared));
+          if (!connected || epoch !== callEpoch || cycle !== speechEpoch) return false;
+          stopSpeech();
+          revealPublicSpeechTextOnly("RIPRODUZIONE VOCALE NON DISPONIBILE — RISPOSTA TESTUALE", {
+            code: "PLAYBACK_UNAVAILABLE",
+          });
+          return false;
+        }
+        pending = next;
+      }
+
+      if (connected && epoch === callEpoch && cycle === speechEpoch) finishSpeechCycle();
+      return true;
+    } catch (error) {
+      if (error?.name === "AbortError" || !connected || epoch !== callEpoch || cycle !== speechEpoch) return false;
+      stopSpeech();
+      revealPublicSpeechTextOnly("VOCE NATURALE TEMPORANEAMENTE NON DISPONIBILE — RISPOSTA TESTUALE", error);
+      return false;
+    } finally {
+      if (currentSpeechAbortController === speechAbortController) currentSpeechAbortController = null;
+    }
   }
   const chunks = splitSpeechIntoChunks(text);
   if (!connected || !chunks.length) return;

@@ -1,17 +1,5 @@
 {
   "hosting": {
-    "public": "dist",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ],
     "headers": [
       {
         "source": "/meiling/**",
@@ -32,19 +20,65 @@
         ]
       },
       {
+        "source": "/grayfox/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
+      {
         "source": "/Francesco-Saccullo_CV.pdf",
         "headers": [
           {
-            "value": "attachment; filename=\"Francesco-Saccullo_CV.pdf\"",
-            "key": "Content-Disposition"
+            "key": "Content-Disposition",
+            "value": "attachment; filename=\"Francesco-Saccullo_CV.pdf\""
           },
           {
-            "value": "public,max-age=3600",
-            "key": "Cache-Control"
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/Francesco-Saccullo_CV_IT.pdf",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          },
+          {
+            "key": "Content-Disposition",
+            "value": "attachment; filename=\"Francesco-Saccullo_CV_IT.pdf\""
           }
         ]
       }
     ],
-    "site": "francesco-saccullo-mediakit"
+    "redirects": [
+      {
+        "source": "/greyfox",
+        "statusCode": 301,
+        "location": "/grayfox/"
+      },
+      {
+        "source": "/greyfox/**",
+        "statusCode": 301,
+        "location": "/grayfox/"
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "path": "/index.html"
+      }
+    ],
+    "site": "francesco-saccullo-mediakit",
+    "public": "dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
   }
 }
